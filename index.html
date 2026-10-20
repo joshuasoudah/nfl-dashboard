@@ -14,21 +14,21 @@ const BASE='https://nfl-live-data.josh-soudah.workers.dev';
 const list=document.querySelector('#list'),status=document.querySelector('#status'),refresh=document.querySelector('#refresh');
 let busy=false,expanded=new Set(),lastSuccess=null,currentTeams=[];
 function year(){const d=new Date(),y=d.getFullYear();return d.getMonth()<2?y-1:y}
-const season=year();document.querySelector('#season').textContent=`${season} Regular Season`;
+const season=year();document.querySelector('#season').textContent=`${season} Regular Season · Times CT`;
 const safe=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const fmt=d=>new Date(d).toLocaleDateString(undefined,{month:'short',day:'numeric'});
-const kickoff=d=>new Date(d).toLocaleTimeString([],{hour:'numeric',minute:'2-digit',timeZoneName:'short'});
-const nowTime=()=>new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+const fmt=d=>new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'America/Chicago'});
+const kickoff=d=>new Date(d).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',timeZone:'America/Chicago',timeZoneName:'short'});
+const nowTime=()=>new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',timeZone:'America/Chicago',timeZoneName:'short'});
 async function json(url){const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status+' from NFL data service');return r.json()}
 function isLive(e){const type=e.status?.type||{};return !type.completed&&(type.state==='in'||['STATUS_IN_PROGRESS','STATUS_HALFTIME','STATUS_END_PERIOD','STATUS_DELAYED'].includes(type.name))}
 function playoffRound(e){const w=Number(e.week?.number||0);return ({1:'Wild Card',2:'Divisional',3:'Conference Championship',4:'Pro Bowl',5:'Super Bowl'})[w]||e.week?.text||'Playoffs'}
-function gameRow(g,kind){const loc=g.away?'AWAY':'HOME',op=g.away?'@':'vs';const round=kind==='playoff'?` · ${safe(g.round)}`:'';
+function gameRow(g,kind){const loc=g.away?'AWAY':'HOME',op=g.away?'@':'vs';const round=kind==='playoff'?` · ${safe(g.round)}`:'';const dateLabel=g.tbd?'TBD':fmt(g.date);
 let result='';if(g.completed)result=`<span class="result ${g.result}">${g.result} ${g.myScore}-${g.otherScore}</span>`;
 else if(g.live)result=`<span class="badge">● LIVE</span><div class="live-score">${g.myScore} - ${g.otherScore}</div><div class="game-meta">${safe(g.clock)}</div>`;
-else result=`<span class="badge">SCHEDULED</span><div class="game-meta">${safe(kickoff(g.date))}</div>`;
-return `<div class="game ${kind==='playoff'?'playoff':kind==='upcoming'?'upcoming':''} ${g.live?'is-live':''}"><div class="game-info"><div>${fmt(g.date)} · <strong>${loc}</strong> · ${op} ${safe(g.opponent)}</div>${round?`<div class="game-meta">${round.slice(3)}</div>`:''}</div><div class="game-score">${result}</div></div>`}
+else result=`<span class="badge">SCHEDULED</span><div class="game-meta">${g.tbd?'Kickoff TBD':safe(kickoff(g.date))}</div>`;
+return `<div class="game ${kind==='playoff'?'playoff':kind==='upcoming'?'upcoming':''} ${g.live?'is-live':''}"><div class="game-info"><div>${dateLabel} · <strong>${loc}</strong> · ${op} ${safe(g.opponent)}</div>${round?`<div class="game-meta">${round.slice(3)}</div>`:''}</div><div class="game-score">${result}</div></div>`}
 function gamesHtml(t){const playoff=t.games.filter(g=>g.type===3).sort((a,b)=>Date.parse(a.date)-Date.parse(b.date));
-const upcoming=t.games.filter(g=>g.type===2&&!g.completed).sort((a,b)=>Date.parse(a.date)-Date.parse(b.date));
+const upcoming=t.games.filter(g=>g.type===2&&!g.completed).sort((a,b)=>(a.tbd-b.tbd)||Date.parse(a.date)-Date.parse(b.date)||a.week-b.week);
 const completed=t.games.filter(g=>g.type===2&&g.completed).sort((a,b)=>Date.parse(b.date)-Date.parse(a.date));
 let html='';if(playoff.length)html+=`<div class="section-title playoff-title">PLAYOFF GAMES</div>${playoff.map(g=>gameRow(g,'playoff')).join('')}`;
 if(upcoming.length)html+=`<div class="section-title upcoming-title">UPCOMING REGULAR-SEASON GAMES</div>${upcoming.map(g=>gameRow(g,'upcoming')).join('')}`;
@@ -40,14 +40,14 @@ try{const requests=[json(`${BASE}/teams?limit=40`)];for(let w=1;w<=18;w++)reques
 const responses=await Promise.allSettled(requests);if(responses[0].status!=='fulfilled')throw responses[0].reason;
 const rawTeams=responses[0].value.sports?.[0]?.leagues?.[0]?.teams||[];if(rawTeams.length<32)throw Error('Could not retrieve all 32 teams');
 const teams=new Map(rawTeams.map(x=>{const t=x.team;return[String(t.id),{id:String(t.id),name:t.displayName,logo:t.logos?.[0]?.href||'',w:0,l:0,t:0,pf:0,pa:0,games:[]}]}));
-const events=new Map();let failures=0;for(let i=1;i<responses.length;i++){const r=responses[i];if(r.status!=='fulfilled'){failures++;continue}const expectedType=i<=18?2:3;for(const e of r.value.events||[]){const actualType=Number(e.season?.type||expectedType);if(actualType!==expectedType)continue;events.set(`${actualType}:${e.id}`,{...e,_type:actualType})}}
+const events=new Map();let failures=0;for(let i=1;i<responses.length;i++){const r=responses[i];if(r.status!=='fulfilled'){failures++;continue}const expectedType=i<=18?2:3;for(const e of r.value.events||[]){if(expectedType===2&&Number(e.week?.number||e.weekNumber||i)!==i)continue;const actualType=Number(e.season?.type||expectedType);if(actualType!==expectedType)continue;events.set(`${actualType}:${e.id}`,{...e,_type:actualType,_week:expectedType===2?i:i-18})}}
 if(!events.size)throw Error('No NFL schedule data available');
 for(const e of events.values()){const competitors=e.competitions?.[0]?.competitors||[];if(competitors.length!==2)continue;const [a,b]=competitors;if(!teams.has(String(a.id))||!teams.has(String(b.id)))continue;
 const completed=!!e.status?.type?.completed,live=isLive(e);const sa=Number(a.score),sb=Number(b.score);if(completed&&(!Number.isFinite(sa)||!Number.isFinite(sb)))continue;
 for(const [me,other,myScore,otherScore] of [[a,b,sa,sb],[b,a,sb,sa]]){const t=teams.get(String(me.id));const result=completed?(myScore>otherScore?'W':myScore<otherScore?'L':'T'):null;
 if(completed&&e._type===2){t[result.toLowerCase()]++;t.pf+=myScore;t.pa+=otherScore}
-t.games.push({type:e._type,date:e.date,opponent:other.team?.displayName||'Opponent',away:me.homeAway==='away',myScore:Number.isFinite(myScore)?myScore:0,otherScore:Number.isFinite(otherScore)?otherScore:0,result,completed,live,clock:e.status?.displayClock&&e.status?.period?`Q${e.status.period} ${e.status.displayClock}`:e.status?.type?.shortDetail||'In progress',round:playoffRound(e)})}}
-currentTeams=[...teams.values()].map(t=>({...t,pct:t.w+t.l+t.t?(t.w+t.t/2)/(t.w+t.l+t.t):0})).sort((a,b)=>b.pct-a.pct||b.w-a.w||(b.pf-b.pa)-(a.pf-a.pa)||a.name.localeCompare(b.name));render();lastSuccess=new Date();status.textContent=`Updated ${nowTime()} · ${events.size} games checked${failures?` · ${failures} schedule requests unavailable`:''} · Auto-refresh every 15 sec`;
+t.games.push({type:e._type,date:e.date,opponent:other.team?.displayName||'Opponent',away:me.homeAway==='away',myScore:Number.isFinite(myScore)?myScore:0,otherScore:Number.isFinite(otherScore)?otherScore:0,result,completed,live,clock:e.status?.displayClock&&e.status?.period?`Q${e.status.period} ${e.status.displayClock}`:e.status?.type?.shortDetail||'In progress',round:playoffRound(e),week:e._week,tbd:e._type===2&&!completed&&e._week>=17})}}
+currentTeams=[...teams.values()].map(t=>({...t,pct:t.w+t.l+t.t?(t.w+t.t/2)/(t.w+t.l+t.t):0})).sort((a,b)=>b.pct-a.pct||b.w-a.w||(b.pf-b.pa)-(a.pf-a.pa)||a.name.localeCompare(b.name));render();lastSuccess=new Date();status.textContent=`Updated ${nowTime()} · ${events.size} games checked · All times Central${failures?` · ${failures} schedule requests unavailable`:''} · Auto-refresh every 15 sec`;
 }catch(err){status.innerHTML=`<span class="error">Unable to refresh: ${safe(err.message)}.</span> ${lastSuccess?'Showing previously loaded results.':'Check your connection and try again.'}`}
 finally{busy=false;refresh.disabled=false;refresh.classList.remove('spin')}}
 list.addEventListener('click',e=>{const btn=e.target.closest('button[data-id]');if(!btn)return;const id=btn.dataset.id;expanded.has(id)?expanded.delete(id):expanded.add(id);render()});
