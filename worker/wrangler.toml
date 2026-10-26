@@ -1,0 +1,11 @@
+name = "nfl-live-data"
+main = "worker.js"
+compatibility_date = "2026-10-26"
+
+# No KV (or other) bindings. Draft and roster caching uses caches.default.
+
+[observability]
+enabled = true
+
+[observability.traces]
+enabled = true
