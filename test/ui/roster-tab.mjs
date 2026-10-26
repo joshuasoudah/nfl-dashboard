@@ -3,19 +3,9 @@ import { readFileSync } from 'node:fs';
 import { dirname, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
-import { joinRoster } from '../../worker/worker.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
-const rosterJson = JSON.parse(readFileSync(join(root, 'test/fixtures/roster30.json'), 'utf8'));
-const depthJson = JSON.parse(readFileSync(join(root, 'test/fixtures/dc_site30.json'), 'utf8'));
-const joined = joinRoster(rosterJson, depthJson);
-const jaguars = {
-  team: { id: '30', name: 'Jacksonville Jaguars', abbreviation: 'JAX' },
-  updated: '2026-10-26T16:00:00.000Z',
-  source: 'ESPN depth chart',
-  sections: joined.sections,
-  other: joined.other
-};
+const jaguars = JSON.parse(readFileSync(join(root, 'test/fixtures/roster-live-30.json'), 'utf8'));
 
 const TEAMS = [
   [1, 'Atlanta Falcons', 'ATL', 'atl'],
@@ -109,7 +99,7 @@ function scoreboardFor(url) {
 function mockDraft(id) {
   if (id === '4360310') return { year: 2021, round: 1, pick: 1 };
   if (id === '4426349') return { year: 2022, round: 1, pick: 1 };
-  if (id === '4889929') return null;
+  if (id === '3916433') return null;
   const n = Number(id.slice(-3)) || 1;
   return { year: 2018 + (n % 8), round: (n % 7) + 1, pick: (n % 200) + 1 };
 }
@@ -282,10 +272,10 @@ async function main() {
 
     releaseDraft();
     await page.locator('.player', { hasText: 'Trevor Lawrence' }).locator('.draft', { hasText: 'Drafted 2021 · Rd 1, Pk 1' }).waitFor();
-    const quinn = page.locator('.player', { hasText: 'Quinn Ewers' });
-    await quinn.scrollIntoViewIfNeeded();
-    assert((await quinn.locator('.draft').innerText()) === 'Undrafted');
-    assert(await quinn.locator('.badge-starter').count() === 0, 'backup is not the starter');
+    const meyers = page.locator('.player', { hasText: 'Jakobi Meyers' });
+    await meyers.scrollIntoViewIfNeeded();
+    assert((await meyers.locator('.draft').innerText()) === 'Undrafted');
+    assert(await meyers.locator('.badge-starter').count() === 1, 'Jakobi Meyers is the WR2 starter');
 
     const uniqueIds = new Set(jaguars.sections.flatMap(section => section.positions.flatMap(position => position.players.map(player => player.id))).concat(jaguars.other.map(player => player.id)));
     const requestedDeadline = Date.now() + 3000;
@@ -312,7 +302,7 @@ async function main() {
 
     const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('nfl-draft-cache-v1')));
     assert(stored['4360310'].draft.year === 2021, 'draft cache stored Trevor Lawrence');
-    assert(stored['4889929'].draft === null, 'undrafted cache stored null');
+    assert(stored['3916433'].draft === null, 'undrafted cache stored Jakobi Meyers as null');
 
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.evaluate(async () => {
@@ -322,11 +312,11 @@ async function main() {
         img.addEventListener('error', resolve, { once: true });
       })));
     });
-    await page.screenshot({ path: '/opt/cursor/artifacts/roster_tab_desktop.png' });
+    await page.screenshot({ path: '/opt/cursor/artifacts/roster_tab_live_desktop.png' });
     await page.setViewportSize({ width: 390, height: 844 });
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.getByRole('tab', { name: 'Roster', selected: true }).waitFor();
-    await page.screenshot({ path: '/opt/cursor/artifacts/roster_tab_mobile.png' });
+    await page.screenshot({ path: '/opt/cursor/artifacts/roster_tab_live_mobile.png' });
     await page.setViewportSize({ width: 1280, height: 900 });
 
     const other = page.locator('.other-roster');
@@ -400,7 +390,7 @@ async function main() {
 
     assert(pageErrors.length === 0, pageErrors.join('\n'));
     console.log('UI roster checks passed');
-    console.log('screenshots: /opt/cursor/artifacts/roster_tab_desktop.png /opt/cursor/artifacts/roster_tab_mobile.png');
+    console.log('screenshots: /opt/cursor/artifacts/roster_tab_live_desktop.png /opt/cursor/artifacts/roster_tab_live_mobile.png');
   } finally {
     await browser.close();
     await new Promise(resolve => server.close(resolve));

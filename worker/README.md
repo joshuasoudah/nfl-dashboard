@@ -1,19 +1,27 @@
 # nfl-live-data worker
 
-This folder is the source for the existing `nfl-live-data` Worker. It keeps the current `/teams`, `/scoreboard`, and `/standings` proxies and adds:
+This folder is the source for the `nfl-live-data` Worker. The owner has already deployed `worker/worker.js` to Cloudflare. Redeploy only if you change that file.
 
-- `GET /roster?team={espnTeamId}` — team id must be an integer from 1 through 34. Fetches the ESPN roster and depth chart, joins them by player id, and returns offense, defense, and special teams in depth order plus an `other` list. Cached with the Cache API (`caches.default`) for 2 hours.
-- `GET /draft?ids=1,2,3` — at most 40 athlete ids. Each id is read from `https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/athletes/{id}` with at most 6 requests in flight. A hit returns `{year, round, pick}`. A player with no draft object returns `null` (undrafted). A failed lookup is omitted so the page can tell it apart from undrafted. Successful lookups are cached for 30 days. There is no KV binding.
+It keeps the `/teams`, `/scoreboard`, and `/standings` proxies and adds:
 
-The Workers Free plan allows 50 subrequests per invocation. `/roster` uses 2. `/draft` uses at most 40, and only for cache misses.
+- `GET /roster?team={espnTeamId}` — team id must be an integer from 1 through 34. Fetches the ESPN roster and depth chart, joins them by player id, and returns offense, defense, and special teams in depth order plus an `other` list. The joined response is cached with the Cache API (`caches.default`) for 2 hours. `draft` on each player is `null`; the page fills that in separately.
+- `GET /draft?ids=1,2,3` — at most 40 athlete ids, fetched from `https://site.api.espn.com/apis/common/v3/sports/football/nfl/athletes/{id}` with at most 6 requests in flight. `athlete.displayDraft` looks like `2022: Rd 2, Pk 41 (SEA)` and is parsed to `{year, round, pick}`. Players with no `displayDraft` return `null` (undrafted). A failed lookup is omitted so the page can tell it apart from undrafted. Each athlete request uses `cf: { cacheTtl, cacheEverything }` (30 days) instead of the Cache API.
 
-`worker.js` is self-contained. The dashboard editor can run that one file.
+The Workers Free plan allows 50 subrequests per invocation, and Cache API `match`/`put` calls count toward that limit. `/roster` still uses the Cache API (one match, and one put on a miss, plus 2 ESPN fetches). `/draft` does not call the Cache API: it is one `fetch` per id, at most 40.
 
-ESPN's API is unofficial. The depth chart is ESPN's own chart, not a chart published by the team. Do not deploy this until the pull request has been reviewed. This repository change does not deploy the Worker.
+`worker.js` is self-contained. The dashboard editor can run that one file. There is no KV binding.
 
-## Deploy
+Three fixes are in the deployed script, found while testing the first version live:
 
-From a machine logged into the Cloudflare account that already owns `nfl-live-data`:
+1. `fetch` is wrapped as `(...args) => fetch(...args)`. Passing the global `fetch` through and calling it as a method threw `Illegal invocation` in Workers.
+2. `sports.core.api.espn.com` returns 403 to Workers. Draft text comes from the site common v3 athlete endpoint instead.
+3. Per-athlete Cache API reads and writes were removed so a 40-id `/draft` call stays under the 50-subrequest cap. Edge caching is the `cf.cacheTtl` on that single fetch.
+
+ESPN's API is unofficial. The depth chart is ESPN's own chart, not a chart published by the team.
+
+## Redeploy
+
+Only needed after a change to `worker/worker.js`. From a machine logged into the Cloudflare account that owns `nfl-live-data`:
 
 ```bash
 cd worker
@@ -21,15 +29,13 @@ npx wrangler login
 npx wrangler deploy
 ```
 
-`wrangler deploy` publishes the Worker named `nfl-live-data` using `wrangler.toml`. That replaces the live script. `compatibility_date` in that file is `2026-10-26`. The live Worker may be on an older compatibility date today; check the dashboard setting before deploying if you need to keep it.
+`wrangler deploy` publishes the Worker named `nfl-live-data` from `wrangler.toml` and replaces the live script. `compatibility_date` in that file is `2026-10-26`.
 
-Dashboard alternative: Workers & Pages → `nfl-live-data` → Edit code. Replace the whole script with the contents of `worker/worker.js`, then Save and Deploy. Paste the entire file. The quick editor's preview does not persist Cache API writes; caching still applies on the deployed Worker, and a cache failure does not fail the request.
+Dashboard alternative: Workers & Pages → `nfl-live-data` → Edit code. Replace the whole script with the contents of `worker/worker.js`, then Save and Deploy.
 
 No KV namespace, secret, or new binding is required.
 
-## Until the Worker is deployed
-
-The site keeps calling `https://nfl-live-data.josh-soudah.workers.dev`. The Worker that is live today answers unknown paths with its "API is running" JSON. The Roster tab treats that as unavailable and shows a retry. Standings, live scores, and the Games tab do not use `/roster` or `/draft`, so they keep working. After a deploy, open Roster again or press Retry. Draft lines fill in after `/draft` responds; until then they stay on `...`, and a failed batch shows "Draft unavailable" per player.
+The page calls `https://nfl-live-data.josh-soudah.workers.dev`. Roster and draft responses that are not the expected JSON show as unavailable or "Draft unavailable" per player. Standings and the Games tab do not use those routes.
 
 ## Tests
 
@@ -39,4 +45,4 @@ From the repository root:
 node --test test/*.test.mjs
 ```
 
-Those tests use the saved Jacksonville roster, depth chart, and athlete fixtures. They do not call ESPN or Cloudflare. The browser check is `node test/ui/roster-tab.mjs` (Playwright, Chrome). It serves `index.html` locally and mocks the Worker.
+Those tests use saved ESPN fixtures, including a common v3 athlete (`ath.json`, Kenneth Walker III) and an undrafted one (`ath-undrafted.json`, Jakobi Meyers). `roster-live-30.json` is a saved `GET /roster?team=30` response from the deployed Worker. The unit tests do not call ESPN or Cloudflare. The browser check is `node test/ui/roster-tab.mjs` (Playwright, Chrome). It serves `index.html` locally and returns that saved roster payload for `/roster`.

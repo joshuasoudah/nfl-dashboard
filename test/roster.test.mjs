@@ -22,6 +22,8 @@ const root = dirname(fileURLToPath(import.meta.url));
 const roster = JSON.parse(readFileSync(join(root, 'fixtures/roster30.json'), 'utf8'));
 const depth = JSON.parse(readFileSync(join(root, 'fixtures/dc_site30.json'), 'utf8'));
 const athlete = JSON.parse(readFileSync(join(root, 'fixtures/ath.json'), 'utf8'));
+const undraftedAthlete = JSON.parse(readFileSync(join(root, 'fixtures/ath-undrafted.json'), 'utf8'));
+const liveRoster = JSON.parse(readFileSync(join(root, 'fixtures/roster-live-30.json'), 'utf8'));
 
 function flatten(joined) {
   const rows = [];
@@ -210,11 +212,34 @@ test('draft ids are validated and capped at 40', () => {
   for (const value of ['0', '35', '01', '30abc', '', '3.5']) assert.equal(parseTeamId(value), null);
 });
 
-test('athlete draft uses year, round, and selection', () => {
-  assert.deepEqual(draftFromAthlete(athlete), { year: 2022, round: 1, pick: 1 });
-  assert.equal(draftFromAthlete({ id: '1', displayName: 'Undrafted' }), null);
-  assert.equal(draftFromAthlete({ draft: { displayText: 'Undrafted' } }), null);
-  assert.deepEqual(draftFromAthlete({ draft: { year: 2019, round: 4, pick: 12 } }), { year: 2019, round: 4, pick: 12 });
+test('displayDraft from the common v3 athlete payload parses to year, round, and pick', () => {
+  assert.equal(athlete.athlete.id, '4567048');
+  assert.equal(athlete.athlete.displayName, 'Kenneth Walker III');
+  assert.equal(athlete.athlete.displayDraft, '2022: Rd 2, Pk 41 (SEA)');
+  assert.deepEqual(draftFromAthlete(athlete), { year: 2022, round: 2, pick: 41 });
+  assert.equal(undraftedAthlete.athlete.id, '3916433');
+  assert.equal(undraftedAthlete.athlete.displayName, 'Jakobi Meyers');
+  assert.equal(Object.hasOwn(undraftedAthlete.athlete, 'displayDraft'), false);
+  assert.equal(draftFromAthlete(undraftedAthlete), null);
+  assert.deepEqual(draftFromAthlete({ athlete: { displayDraft: '2019: Rd 4, Pk 12 (NYG)' } }), { year: 2019, round: 4, pick: 12 });
+  assert.equal(draftFromAthlete({ athlete: { displayDraft: 'undrafted' } }), null);
+  assert.equal(draftFromAthlete({ draft: { year: 2019, round: 4, selection: 12, displayText: 'Year: 2019 Round: 4 Pick: 12' } }), null);
+});
+
+test('saved live /roster response is the shape the page renders', () => {
+  assert.equal(liveRoster.source, 'ESPN depth chart');
+  assert.equal(liveRoster.team.id, '30');
+  assert.equal(liveRoster.team.abbreviation, 'JAX');
+  assert.equal(Array.isArray(liveRoster.sections), true);
+  assert.equal(Array.isArray(liveRoster.other), true);
+  const qb = liveRoster.sections[0].positions.find(position => position.pos === 'QB').players[0];
+  assert.equal(qb.name, 'Trevor Lawrence');
+  assert.equal(qb.starter, true);
+  assert.equal(qb.draft, null);
+  const meyers = liveRoster.sections[0].positions.find(position => position.pos === 'WR2').players[0];
+  assert.equal(meyers.id, '3916433');
+  assert.equal(meyers.name, 'Jakobi Meyers');
+  assert.equal(meyers.draft, null);
 });
 
 test('mapPool limits how many draft lookups run at once', async () => {
@@ -231,45 +256,71 @@ test('mapPool limits how many draft lookups run at once', async () => {
   assert.deepEqual(results, [1, 2, 3, 4, 5, 6, 7]);
 });
 
-test('draft route batches with a concurrency cap, caches hits, and skips failures', async () => {
+function throwingCache() {
+  return {
+    async match() { throw new Error('cache.match should not run during /draft'); },
+    async put() { throw new Error('cache.put should not run during /draft'); }
+  };
+}
+
+test('draft route makes one common-v3 fetch per id and does not use the Cache API', async () => {
   let active = 0;
   let maxActive = 0;
   const fetched = [];
-  const fetchImpl = async (url) => {
+  const fetchImpl = async (url, init) => {
     active += 1;
     maxActive = Math.max(maxActive, active);
     await new Promise(resolve => setTimeout(resolve, 10));
     active -= 1;
-    fetched.push(url);
+    fetched.push({ url, init });
     const id = url.slice(url.lastIndexOf('/') + 1);
     if (id === '9') return new Response('nope', { status: 500 });
-    const body = id === '2' ? { id } : { id, draft: { year: 2020, round: 1, selection: Number(id) } };
-    return Response.json(body);
+    if (id === '2') return Response.json({ athlete: { id, displayName: 'No draft line' } });
+    return Response.json({ athlete: { id, displayDraft: `2020: Rd 1, Pk ${id}` } });
   };
-  const cache = memoryCache();
-  const handler = createHandler({ fetch: fetchImpl, cache });
-  const ids = Array.from({ length: 10 }, (_, index) => String(index + 1)).join(',');
-  const response = await handler(new Request(`https://nfl.example/draft?ids=${ids}`));
+  const handler = createHandler({ fetch: fetchImpl, cache: throwingCache() });
+  const ids = Array.from({ length: 10 }, (_, index) => String(index + 1));
+  const response = await handler(new Request(`https://nfl.example/draft?ids=${ids.join(',')}`));
   assert.equal(response.status, 200);
   const body = await response.json();
   assert.ok(maxActive <= DRAFT_CONCURRENCY);
   assert.ok(maxActive > 1);
-  assert.equal(body['1'].pick, 1);
+  assert.deepEqual(body['1'], { year: 2020, round: 1, pick: 1 });
   assert.equal(body['2'], null);
   assert.equal(Object.hasOwn(body, '9'), false);
-  assert.equal(fetched.length, 10);
+  assert.equal(fetched.length, ids.length);
+  for (const call of fetched) {
+    assert.match(call.url, /^https:\/\/site\.api\.espn\.com\/apis\/common\/v3\/sports\/football\/nfl\/athletes\/\d+$/);
+    assert.equal(call.init.cf.cacheTtl, DRAFT_CACHE_SECONDS);
+    assert.equal(call.init.cf.cacheEverything, true);
+  }
+  const again = await handler(new Request(`https://nfl.example/draft?ids=${ids.join(',')}`));
+  assert.equal(again.status, 200);
+  assert.equal(fetched.length, ids.length * 2);
+  assert.equal((await again.json())['1'].year, 2020);
+});
 
-  const stored = cache.store.get('https://nfl-live-data.cache/athlete/4426349');
-  assert.equal(stored, undefined);
-  const cachedAthlete = cache.store.get('https://nfl-live-data.cache/athlete/1');
-  assert.equal(cachedAthlete.headers.get('Cache-Control'), `public, max-age=${DRAFT_CACHE_SECONDS}`);
-  assert.equal(cache.store.has('https://nfl-live-data.cache/athlete/9'), false);
-
-  const again = await handler(new Request(`https://nfl.example/draft?ids=${ids}`));
-  const againBody = await again.json();
-  assert.equal(fetched.length, 11);
-  assert.equal(againBody['1'].year, 2020);
-  assert.equal(Object.hasOwn(againBody, '9'), false);
+test('createHandler default fetch is not called with the deps object as this', async () => {
+  const original = globalThis.fetch;
+  const receivers = [];
+  globalThis.fetch = function (...args) {
+    receivers.push(this);
+    const url = String(args[0]);
+    assert.match(url, /\/apis\/common\/v3\/sports\/football\/nfl\/athletes\/4567048$/);
+    return Promise.resolve(Response.json({ athlete: { displayDraft: '2022: Rd 2, Pk 41 (SEA)' } }));
+  };
+  try {
+    const handler = createHandler();
+    const response = await handler(new Request('https://nfl.example/draft?ids=4567048'));
+    assert.equal(response.status, 200);
+    assert.deepEqual((await response.json())['4567048'], { year: 2022, round: 2, pick: 41 });
+    assert.equal(receivers.length, 1);
+    const receiver = receivers[0];
+    const calledAsDeps = !!(receiver && typeof receiver === 'object' && typeof receiver.fetch === 'function' && Object.hasOwn(receiver, 'cache'));
+    assert.equal(calledAsDeps, false);
+  } finally {
+    globalThis.fetch = original;
+  }
 });
 
 test('draft route rejects more than 40 ids before fetching', async () => {
@@ -369,6 +420,9 @@ test('worker source stays on the Cache API without a KV binding', () => {
   const source = readFileSync(join(root, '../worker/worker.js'), 'utf8');
   const toml = readFileSync(join(root, '../worker/wrangler.toml'), 'utf8');
   assert.match(source, /caches\.default/);
+  assert.match(source, /\(\.\.\.args\) => fetch\(\.\.\.args\)/);
+  assert.match(source, /apis\/common\/v3\/sports\/football\/nfl\/athletes/);
+  assert.doesNotMatch(source, /sports\.core\.api\.espn\.com/);
   assert.doesNotMatch(source, /kv_namespaces|KVNamespace/);
   assert.doesNotMatch(toml, /kv_namespaces/);
   assert.match(toml, /name = "nfl-live-data"/);

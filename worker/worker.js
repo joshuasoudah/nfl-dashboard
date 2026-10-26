@@ -9,7 +9,7 @@
 // athlete drafts for 30 days, a joined roster for 2 hours. No KV binding.
 
 const ESPN_SITE = "https://site.api.espn.com";
-const ESPN_CORE = "https://sports.core.api.espn.com";
+const ESPN_COMMON = "https://site.api.espn.com";
 export const ALLOWED_ORIGIN = "https://joshuasoudah.github.io";
 
 export const MAX_TEAM_ID = 34;
@@ -49,19 +49,14 @@ export function parseDraftIds(value) {
   return { ids };
 }
 
-export function draftFromAthlete(athlete) {
-  const draft = athlete && typeof athlete === "object" ? athlete.draft : null;
-  if (!draft || typeof draft !== "object") return null;
-  const year = Number(draft.year);
-  if (!Number.isFinite(year) || year <= 0) return null;
-  const round = Number(draft.round);
-  const pickSource = draft.selection != null ? draft.selection : draft.pick;
-  const pick = Number(pickSource);
-  return {
-    year,
-    round: Number.isFinite(round) ? round : null,
-    pick: Number.isFinite(pick) ? pick : null
-  };
+export function draftFromAthlete(payload) {
+  // Common v3 athlete payload: { athlete: { displayDraft: "2022: Rd 2, Pk 41 (SEA)" } }.
+  // Undrafted players have no displayDraft. The core API is not used: it returns 403 to Workers.
+  const athlete = payload && typeof payload === "object" && payload.athlete ? payload.athlete : payload;
+  const text = athlete && typeof athlete.displayDraft === "string" ? athlete.displayDraft : "";
+  const match = /(\d{4})\s*:\s*Rd\s*(\d+)\s*,\s*Pk\s*(\d+)/i.exec(text);
+  if (!match) return null;
+  return { year: Number(match[1]), round: Number(match[2]), pick: Number(match[3]) };
 }
 
 export function classifyDepthChart(name) {
@@ -318,16 +313,13 @@ async function handleRoster(url, deps, corsHeaders) {
 }
 
 async function loadDraft(id, deps) {
-  const key = cacheRequest(`/athlete/${id}`);
-  const cached = await cacheGet(deps.cache, key);
-  if (cached && Object.prototype.hasOwnProperty.call(cached, "draft")) {
-    return { id, ok: true, draft: cached.draft ?? null };
-  }
-
+  // One subrequest per athlete. The Workers Free plan allows 50 per invocation and counts
+  // Cache API calls too, so the edge cache is used through fetch options instead.
   let response;
   try {
-    response = await deps.fetch(`${ESPN_CORE}/v2/sports/football/leagues/nfl/athletes/${id}`, {
-      headers: { "Accept": "application/json" }
+    response = await deps.fetch(`${ESPN_COMMON}/apis/common/v3/sports/football/nfl/athletes/${id}`, {
+      headers: { "Accept": "application/json" },
+      cf: { cacheTtl: DRAFT_CACHE_SECONDS, cacheEverything: true }
     });
   } catch (error) {
     console.error(JSON.stringify({ msg: "athlete fetch failed", id, error: String(error && error.message || error) }));
@@ -339,9 +331,7 @@ async function loadDraft(id, deps) {
   }
   const athlete = await readJson(response);
   if (!athlete) return { id, ok: false };
-  const draft = draftFromAthlete(athlete);
-  await cachePut(deps.cache, key, { draft }, DRAFT_CACHE_SECONDS);
-  return { id, ok: true, draft };
+  return { id, ok: true, draft: draftFromAthlete(athlete) };
 }
 
 async function handleDraft(url, deps, corsHeaders) {
@@ -381,7 +371,7 @@ async function handleProxy(url, deps, corsHeaders) {
 
 export function createHandler(deps = {}) {
   const runtime = {
-    fetch: deps.fetch || fetch,
+    fetch: deps.fetch || ((...args) => fetch(...args)),
     cache: deps.cache !== undefined ? deps.cache : runtimeCache()
   };
 
