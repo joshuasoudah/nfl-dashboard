@@ -1,103 +1,102 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><link rel="apple-touch-icon" href="Cinematic%20NFL%20Stadium%20Shield%20Icon.png"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#101827"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="NFL Standings"><title>NFL Standings</title><link rel="manifest" href="manifest.webmanifest"><style>
-:root{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#f7f9fc;background:#0b1220;color-scheme:dark}*{box-sizing:border-box}body{margin:0}main{max-width:740px;margin:auto;padding:calc(env(safe-area-inset-top) + 22px) 16px 60px}header{display:flex;align-items:center;justify-content:space-between;gap:12px}h1{font-size:27px;margin:0}p{color:#9daec5}button{font:inherit;cursor:pointer}.refresh{background:#223653;color:white;border:1px solid #456184;border-radius:12px;padding:10px 13px}.meta{font-size:13px;margin:12px 0 20px}.head,.team{display:grid;grid-template-columns:30px 1fr 80px 24px;gap:9px;align-items:center}.head{font-size:12px;color:#9daec5;padding:8px 12px}.entry{border:1px solid #25334a;border-radius:14px;margin:7px 0;overflow:hidden;background:#151f30}.team{width:100%;padding:13px 12px;background:transparent;border:0;color:inherit;text-align:left}.rank{color:#9daec5}.identity{display:flex;gap:10px;align-items:center;min-width:0}.identity img{width:34px;height:34px;object-fit:contain}.identity .score-logo{width:15px;height:15px}.name{font-size:14px;font-weight:650}.sub{font-size:11px;color:#9daec5;margin-top:2px}.record{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}.pct{font-size:11px;color:#9daec5;font-weight:400}.arrow{text-align:right;color:#9daec5}.games{padding:0 14px 12px 51px;border-top:1px solid #25334a}.game{display:flex;justify-content:space-between;gap:10px;padding:11px 0;border-bottom:1px solid #25334a;font-size:13px}.game:last-child{border:0}.result{font-weight:750;white-space:nowrap}.W{color:#75e0a2}.L{color:#ff9292}.T{color:#ffda84}.error{color:#ffaaaa}.empty{padding:16px;color:#9daec5;font-size:13px}.spin{opacity:.55}footer{font-size:12px;color:#8394ac;margin-top:22px;line-height:1.5}
-.entry.live-team{background:#143328;border-color:#39b986;box-shadow:inset 0 0 0 1px #267d5e}
-.live-indicator{color:#75e0a2;font-weight:700}.live-score{color:#9ef1c1;font-size:11px;margin-top:3px;font-weight:650}
-.scorebox{display:grid;grid-template-columns:15px auto auto;column-gap:4px;row-gap:2px;align-items:center;margin-top:3px;width:max-content;max-width:100%;font-size:12px;font-weight:650;font-variant-numeric:tabular-nums;line-height:1.1}
-.scorebox.has-result{grid-template-columns:15px auto auto auto}
-.logo-slot{width:15px;height:15px;display:flex;align-items:center;justify-content:center}
-.score-logo{width:15px;height:15px;object-fit:contain;display:block}
-.scorebox .abbr{font-weight:750;white-space:nowrap}
-.scorebox .pts{font-weight:750;text-align:right}
-.scorebox .result{font-size:12px;line-height:1}
-.section-title{font-size:11px;font-weight:750;letter-spacing:.07em;margin:16px 0 5px;color:#9daec5}
-.section-title.playoff-title{color:#e9b96e}.section-title.upcoming-title{color:#9bc4ff}
-.game{align-items:center}.game .game-info{min-width:0;line-height:1.5}.game .game-meta{font-size:11px;color:#9daec5}.game .game-score{display:flex;flex-direction:column;align-items:flex-end;gap:2px;text-align:right;flex-shrink:0;font-variant-numeric:tabular-nums}.game .scorebox{margin-top:1px}
-.game.upcoming{background:#152b48;border:1px solid #2b4c75;border-radius:9px;margin:6px 0;padding:10px}
-.game.playoff{background:#33291b;border:1px solid #66502c;border-radius:9px;margin:6px 0;padding:10px}
-.game.is-live{outline:1px solid #36ba87}.game .badge{font-size:10px;font-weight:700;color:#9bc4ff}.game.playoff .badge{color:#e9b96e}.game.is-live .badge{color:#75e0a2}
-.tabs{display:flex;flex-wrap:wrap;gap:8px;padding:12px 0 4px}.tab{background:#1b2940;color:#d5e2f2;border:1px solid #314864;border-radius:999px;padding:8px 14px;min-height:40px;font-size:13px;font-weight:750}.tab[aria-selected="true"]{background:#2a4d86;border-color:#6d93c9;color:#fff}.tab:focus-visible,.retry:focus-visible,.team:focus-visible{outline:2px solid #9bc4ff;outline-offset:2px}
-.roster-source{font-size:11px;color:#8394ac;margin:6px 0 2px}.pos-label{font-size:11px;font-weight:750;letter-spacing:.06em;color:#9bc4ff;margin:10px 0 0}.player{display:grid;grid-template-columns:36px minmax(0,1fr);gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid #25334a}.player>div{min-width:0}.pos-block .player:last-child{border-bottom:0}
-.headshot,.headshot-fallback{width:36px;height:36px;border-radius:50%;background:#d5e2f2;object-fit:cover;display:block}.headshot-fallback{display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:750;color:#1c2c44}
-.player-name{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px;font-weight:750}.player-name .meta-chip{font-size:12px;font-weight:650;color:#c5d4e8}.player-meta{font-size:11px;color:#9daec5;line-height:1.45;margin-top:2px}
-.badge-starter{font-size:10px;font-weight:750;color:#102218;background:#75e0a2;border-radius:999px;padding:2px 6px;flex-shrink:0}.badge-injury{font-size:10px;font-weight:750;color:#2a1c0c;background:#ffda84;border-radius:999px;padding:2px 6px;flex-shrink:0}
-.other-roster{margin-top:8px;border-top:1px solid #25334a}.other-roster summary{cursor:pointer;font-size:13px;font-weight:750;color:#d5e2f2;padding:10px 0}.retry{margin-top:8px;background:#223653;color:#fff;border:1px solid #456184;border-radius:10px;padding:8px 12px;min-height:40px}.roster-actions{margin-top:8px}
-@media(max-width:430px){.games{padding-left:14px}.game{font-size:12px}.name{font-size:13px}.scorebox{font-size:11px;column-gap:3px}.logo-slot,.score-logo,.identity .score-logo{width:14px;height:14px}.scorebox{grid-template-columns:14px auto auto}.scorebox.has-result{grid-template-columns:14px auto auto auto}.player{grid-template-columns:32px minmax(0,1fr)}.headshot,.headshot-fallback{width:32px;height:32px}}
-</style></head><body><main><header><div><h1>NFL Standings</h1><p id="season" style="margin:5px 0 0">Regular season only</p></div><button class="refresh" id="refresh">↻ Refresh</button></header><p class="meta" id="status" role="status">Loading latest results…</p><div class="head"><span>#</span><span>TEAM</span><span style="text-align:right">W-L-T</span><span></span></div><div id="list"></div><footer>Sorted by winning percentage (ties count as half a win), then wins, point differential and team name. Regular-season standings only. Playoff and upcoming schedules appear inside each team. ESPN data is unofficial and may be delayed.</footer></main><script>
-const BASE='https://nfl-live-data.josh-soudah.workers.dev';
-const list=document.querySelector('#list'),status=document.querySelector('#status'),refresh=document.querySelector('#refresh');
-let busy=false,expanded=new Set(),lastSuccess=null,currentTeams=[];
-const panelState=new Map(),rosters=new Map(),rosterSeq=new Map(),headshotFailed=new Set();
-const draftMem=new Map(),draftPending=new Set(),draftFailed=new Set();
-const DRAFT_BATCH=40,DRAFT_TTL_MS=30*24*60*60*1000,DRAFT_LS_KEY='nfl-draft-cache-v1';
-function year(){const d=new Date(),y=d.getFullYear();return d.getMonth()<2?y-1:y}
-const season=year();document.querySelector('#season').textContent=`${season} Regular Season · Times CT`;
-const safe=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const fmt=d=>new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'America/Chicago'});
-const kickoff=d=>new Date(d).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',timeZone:'America/Chicago',timeZoneName:'short'});
-const nowTime=()=>new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',timeZone:'America/Chicago',timeZoneName:'short'});
-async function json(url){const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status+' from NFL data service');return r.json()}
-function isLive(e){const type=e.status?.type||{};return !type.completed&&(type.state==='in'||['STATUS_IN_PROGRESS','STATUS_HALFTIME','STATUS_END_PERIOD','STATUS_DELAYED'].includes(type.name))}
-function playoffRound(e){const w=Number(e.week?.number||0);return ({1:'Wild Card',2:'Divisional',3:'Conference Championship',4:'Pro Bowl',5:'Super Bowl'})[w]||e.week?.text||'Playoffs'}
-function logoSlot(src,name){const img=src?`<img class="score-logo" src="${safe(src)}" alt="${safe(name)}" width="15" height="15">`:'';return `<span class="logo-slot">${img}</span>`}
-function scoreBox(g){const mark=g.completed&&g.result?`<span class="result ${g.result}">${g.result}</span>`:'';const pad=mark?'<span></span>':'';
-return `<span class="scorebox${g.live?' live-score':''}${mark?' has-result':''}">${logoSlot(g.myLogo,g.myName)}<span class="abbr">${safe(g.myAbbr)}</span><span class="pts">${g.myScore}</span>${mark}${logoSlot(g.otherLogo,g.opponent)}<span class="abbr">${safe(g.otherAbbr)}</span><span class="pts">${g.otherScore}</span>${pad}</span>`}
-function gameRow(g,kind){const loc=g.away?'AWAY':'HOME',op=g.away?'@':'vs';const round=kind==='playoff'?` · ${safe(g.round)}`:'';const dateLabel=g.tbd?'TBD':fmt(g.date);
-let result='';if(g.completed)result=scoreBox(g);
-else if(g.live)result=`<span class="badge">● LIVE</span>${scoreBox(g)}<div class="game-meta">${safe(g.clock)}</div>`;
-else result=`<span class="badge">SCHEDULED</span><div class="game-meta">${g.tbd?'Kickoff TBD':safe(kickoff(g.date))}</div>`;
-return `<div class="game ${kind==='playoff'?'playoff':kind==='upcoming'?'upcoming':''} ${g.live?'is-live':''}"><div class="game-info"><div>${dateLabel} · <strong>${loc}</strong> · ${op} ${safe(g.opponent)}</div>${round?`<div class="game-meta">${round.slice(3)}</div>`:''}</div><div class="game-score">${result}</div></div>`}
-function gamesHtml(t){const playoff=t.games.filter(g=>g.type===3).sort((a,b)=>Date.parse(a.date)-Date.parse(b.date));
-const upcoming=t.games.filter(g=>g.type===2&&!g.completed).sort((a,b)=>(a.tbd-b.tbd)||Date.parse(a.date)-Date.parse(b.date)||a.week-b.week);
-const completed=t.games.filter(g=>g.type===2&&g.completed).sort((a,b)=>Date.parse(b.date)-Date.parse(a.date));
-let html='';if(playoff.length)html+=`<div class="section-title playoff-title">PLAYOFF GAMES</div>${playoff.map(g=>gameRow(g,'playoff')).join('')}`;
-if(upcoming.length)html+=`<div class="section-title upcoming-title">UPCOMING REGULAR-SEASON GAMES</div>${upcoming.map(g=>gameRow(g,'upcoming')).join('')}`;
-html+=`<div class="section-title">COMPLETED REGULAR-SEASON GAMES</div>${completed.length?completed.map(g=>gameRow(g,'completed')).join(''):'<div class="empty">No completed regular-season games yet.</div>'}`;
-return html}
-function panelFor(id){return panelState.get(id)||{tab:'games',otherOpen:false}}
-function savePanel(id,patch){const next={...panelFor(id),...patch};panelState.set(id,next);return next}
-function safeUrl(url){const value=String(url||'');return /^https?:\/\//i.test(value)?safe(value):''}
-function initials(name){const parts=String(name||'').trim().split(/\s+/).filter(Boolean);const letters=(parts[0]?.[0]||'')+(parts.length>1?parts[parts.length-1][0]:'');return (letters||'?').toUpperCase()}
-function expLabel(years){if(years==null||years==='')return '';const n=Number(years);if(!Number.isFinite(n))return String(years);if(n<=0)return 'Rookie';return n===1?'1 yr':n+' yrs'}
-function normalizeDraft(draft){if(draft==null)return null;if(typeof draft!=='object')return null;const year=Number(draft.year);if(!Number.isFinite(year))return null;const round=Number(draft.round),pick=Number(draft.pick);return {year,round:Number.isFinite(round)?round:null,pick:Number.isFinite(pick)?pick:null}}
-function loadDraftCache(){try{const raw=JSON.parse(localStorage.getItem(DRAFT_LS_KEY)||'{}');const now=Date.now();let changed=false;for(const [id,rec] of Object.entries(raw)){if(!rec||typeof rec!=='object'||!(rec.exp>now)||!('draft' in rec)){changed=true;continue}draftMem.set(id,{draft:normalizeDraft(rec.draft),exp:rec.exp})}if(changed)persistDrafts()}catch{/* private mode or unreadable storage */}}
-function persistDrafts(){try{const now=Date.now(),out={};for(const [id,rec] of draftMem){if(rec&&rec.exp>now)out[id]={draft:rec.draft,exp:rec.exp}}localStorage.setItem(DRAFT_LS_KEY,JSON.stringify(out))}catch{/* quota or private mode */}}
-function draftText(id){if(draftFailed.has(id))return 'Draft unavailable';if(!draftMem.has(id))return '...';const draft=draftMem.get(id).draft;if(draft==null)return 'Undrafted';const parts=[];if(draft.round!=null)parts.push('Rd '+draft.round);if(draft.pick!=null)parts.push('Pk '+draft.pick);return parts.length?`Drafted ${draft.year} · ${parts.join(', ')}`:`Drafted ${draft.year}`}
-function applyDraftDom(){document.querySelectorAll('[data-draft-id]').forEach(el=>{el.textContent=draftText(el.dataset.draftId)})}
-function collectIds(data){const ids=[],seen=new Set();const add=player=>{if(!player||player.id==null)return;const id=String(player.id);if(seen.has(id))return;seen.add(id);ids.push(id)};for(const section of data.sections||[])for(const pos of section.positions||[])for(const player of pos.players||[])add(player);for(const player of data.other||[])add(player);return ids}
-async function fetchDraftBatch(ids){for(const id of ids)draftPending.add(id);try{const response=await fetch(`${BASE}/draft?ids=${ids.map(encodeURIComponent).join(',')}`,{cache:'no-store'});let data=null;try{data=await response.json()}catch{data=null}const usable=response.ok&&data&&typeof data==='object'&&!Array.isArray(data)&&!(data.message&&data.endpoints);const now=Date.now();for(const id of ids){draftPending.delete(id);if(!usable||!Object.prototype.hasOwnProperty.call(data,id)){draftFailed.add(id);continue}const value=data[id];if(value==null)draftMem.set(id,{draft:null,exp:now+DRAFT_TTL_MS});else if(typeof value==='object'&&Number.isFinite(Number(value.year)))draftMem.set(id,{draft:normalizeDraft(value),exp:now+DRAFT_TTL_MS});else draftFailed.add(id)}if(usable)persistDrafts()}catch{for(const id of ids){draftPending.delete(id);draftFailed.add(id)}}applyDraftDom()}
-async function fillDrafts(ids){const need=ids.filter(id=>id&&!draftMem.has(id)&&!draftPending.has(id)&&!draftFailed.has(id));if(!need.length){applyDraftDom();return}const batches=[];for(let i=0;i<need.length;i+=DRAFT_BATCH)batches.push(need.slice(i,i+DRAFT_BATCH));await Promise.all(batches.map(fetchDraftBatch))}
-function clearDraftFailures(ids){for(const id of ids)draftFailed.delete(id)}
-async function ensureRoster(id,{force=false}={}){const current=rosters.get(id);if(!force&&current&&current.state!=='idle')return;const seq=(rosterSeq.get(id)||0)+1;rosterSeq.set(id,seq);if(force&&current?.data)clearDraftFailures(collectIds(current.data));rosters.set(id,{state:'loading',data:null,error:null});render();try{const response=await fetch(`${BASE}/roster?team=${encodeURIComponent(id)}`,{cache:'no-store'});if(rosterSeq.get(id)!==seq)return;let data=null;try{data=await response.json()}catch{data=null}if(rosterSeq.get(id)!==seq)return;if(response.status===404||data?.unavailable)rosters.set(id,{state:'unavailable',data:null,error:null});else if(!response.ok)rosters.set(id,{state:'error',data:null,error:`Could not load roster (HTTP ${response.status}).`});else if(!data||!Array.isArray(data.sections)||!Array.isArray(data.other))rosters.set(id,{state:'unavailable',data:null,error:null});else rosters.set(id,{state:'ready',data,error:null})}catch{if(rosterSeq.get(id)!==seq)return;rosters.set(id,{state:'error',data:null,error:'Could not load roster. Check your connection and try again.'})}if(rosterSeq.get(id)!==seq)return;render();const ready=rosters.get(id);if(ready?.state==='ready')void fillDrafts(collectIds(ready.data))}
-function headshotHtml(player){const letters=initials(player.name);if(!player.headshot||headshotFailed.has(String(player.id)))return `<span class="headshot-fallback" aria-hidden="true">${safe(letters)}</span>`;return `<img class="headshot" data-pid="${safe(player.id)}" data-initials="${safe(letters)}" src="${safeUrl(player.headshot)}" alt="" width="36" height="36" loading="lazy">`}
-function playerRow(player){const chips=[];if(player.jersey)chips.push(`<span class="meta-chip">#${safe(player.jersey)}</span>`);if(player.position)chips.push(`<span class="meta-chip">${safe(player.position)}</span>`);const badges=[];if(player.starter)badges.push('<span class="badge-starter">Starter</span>');if(player.injury)badges.push(`<span class="badge-injury">${safe(player.injury)}</span>`);const meta=[];const size=[player.height,player.weight].filter(Boolean).map(value=>safe(value)).join(' · ');if(size)meta.push(size);if(player.age!=null&&player.age!=='')meta.push('Age '+safe(player.age));const experience=expLabel(player.experience);if(experience)meta.push(safe(experience));if(player.college)meta.push(safe(player.college));const draft=`<span class="draft" data-draft-id="${safe(player.id)}">${safe(draftText(player.id))}</span>`;return `<div class="player">${headshotHtml(player)}<div><div class="player-name"><span>${safe(player.name)}</span>${chips.join('')}${badges.join('')}</div><div class="player-meta">${meta.join(' · ')}${meta.length?' · ':''}${draft}</div></div></div>`}
-function rosterHtml(team){const record=rosters.get(team.id);if(!record||record.state==='loading')return '<div class="empty">Loading roster…</div>';const retry=`<div class="roster-actions"><button type="button" class="retry" data-roster-retry="${safe(team.id)}">Retry</button></div>`;if(record.state==='unavailable')return `<div class="empty">Roster is unavailable for this team right now. Standings and games are unaffected.${retry}</div>`;if(record.state==='error')return `<div class="empty error">${safe(record.error||'Could not load roster.')}${retry}</div>`;const data=record.data;let html=`<div class="roster-source">${safe(data.source||'ESPN depth chart')}</div>`;if(!data.sections.length)html+='<div class="empty">No depth chart published.</div>';for(const section of data.sections){html+=`<div class="section-title">${safe(section.name)}</div>`;for(const position of section.positions||[])html+=`<div class="pos-block"><div class="pos-label">${safe(position.pos)}</div>${(position.players||[]).map(playerRow).join('')}</div>`}const other=data.other||[];if(other.length){const open=panelFor(team.id).otherOpen;html+=`<details class="other-roster"${open?' open':''}><summary data-team="${safe(team.id)}">Other roster (${other.length})</summary>${other.map(playerRow).join('')}</details>`}return html}
-function rosterPanel(team){try{return rosterHtml(team)}catch{return '<div class="empty error">Could not show this roster.</div>'}}
-function tabsHtml(team,tab){const id=safe(team.id);const button=(name,label)=>`<button type="button" class="tab" role="tab" data-tab="${name}" data-team="${id}" aria-selected="${tab===name?'true':'false'}">${label}</button>`;return `<div class="tabs" role="tablist" aria-label="Team details">${button('games','Games')}${button('roster','Roster')}</div>`}
-function render(){list.innerHTML=currentTeams.map((t,i)=>{const open=expanded.has(t.id);const live=t.games.find(g=>g.live);const tab=open?panelFor(t.id).tab:'games';return `<section class="entry ${live?'live-team':''}"><button type="button" class="team" data-id="${safe(t.id)}" aria-expanded="${open}"><span class="rank">${i+1}</span><span class="identity"><img src="${safe(t.logo)}" alt="" loading="lazy"><span><span class="name">${safe(t.name)}</span><span class="sub">${(t.pct*100).toFixed(1)}% · PD ${t.pf-t.pa>0?'+':''}${t.pf-t.pa}</span>${live?`<div class="live-indicator" style="font-size:11px">● LIVE · ${safe(live.clock)}</div>${scoreBox(live)}`:''}</span></span><span class="record">${t.w}-${t.l}-${t.t}</span><span class="arrow">${open?'⌃':'⌄'}</span></button>${open?`<div class="games">${tabsHtml(t,tab)}<div role="tabpanel">${tab==='roster'?rosterPanel(t):gamesHtml(t)}</div></div>`:''}</section>`}).join('')}
-async function load(){if(busy)return;busy=true;refresh.disabled=true;refresh.classList.add('spin');status.textContent='Checking ESPN for the latest results…';
-try{const requests=[json(`${BASE}/teams?limit=40`)];for(let w=1;w<=18;w++)requests.push(json(`${BASE}/scoreboard?season=${season}&seasontype=2&week=${w}&limit=30`));for(let w=1;w<=5;w++)requests.push(json(`${BASE}/scoreboard?season=${season}&seasontype=3&week=${w}&limit=30`));
-const responses=await Promise.allSettled(requests);if(responses[0].status!=='fulfilled')throw responses[0].reason;
-const rawTeams=responses[0].value.sports?.[0]?.leagues?.[0]?.teams||[];if(rawTeams.length<32)throw Error('Could not retrieve all 32 teams');
-const teams=new Map(rawTeams.map(x=>{const t=x.team;return[String(t.id),{id:String(t.id),name:t.displayName,abbr:t.abbreviation||'',logo:t.logos?.[0]?.href||t.logo||'',w:0,l:0,t:0,pf:0,pa:0,games:[]}]}));
-const events=new Map();let failures=0;for(let i=1;i<responses.length;i++){const r=responses[i];if(r.status!=='fulfilled'){failures++;continue}const expectedType=i<=18?2:3;for(const e of r.value.events||[]){if(expectedType===2&&Number(e.week?.number||e.weekNumber||i)!==i)continue;const actualType=Number(e.season?.type||expectedType);if(actualType!==expectedType)continue;events.set(`${actualType}:${e.id}`,{...e,_type:actualType,_week:expectedType===2?i:i-18})}}
-if(!events.size)throw Error('No NFL schedule data available');
-for(const e of events.values()){const competitors=e.competitions?.[0]?.competitors||[];if(competitors.length!==2)continue;const [a,b]=competitors;if(!teams.has(String(a.id))||!teams.has(String(b.id)))continue;
-const completed=!!e.status?.type?.completed,live=isLive(e);const sa=Number(a.score),sb=Number(b.score);if(completed&&(!Number.isFinite(sa)||!Number.isFinite(sb)))continue;
-for(const [me,other,myScore,otherScore] of [[a,b,sa,sb],[b,a,sb,sa]]){const t=teams.get(String(me.id));const opp=teams.get(String(other.id));const result=completed?(myScore>otherScore?'W':myScore<otherScore?'L':'T'):null;
-if(completed&&e._type===2){t[result.toLowerCase()]++;t.pf+=myScore;t.pa+=otherScore}
-t.games.push({type:e._type,date:e.date,opponent:other.team?.displayName||opp.name||'Opponent',myName:me.team?.displayName||t.name,myAbbr:me.team?.abbreviation||t.abbr||'',otherAbbr:other.team?.abbreviation||opp.abbr||'',myLogo:t.logo||me.team?.logo||'',otherLogo:opp.logo||other.team?.logo||'',away:me.homeAway==='away',myScore:Number.isFinite(myScore)?myScore:0,otherScore:Number.isFinite(otherScore)?otherScore:0,result,completed,live,clock:e.status?.displayClock&&e.status?.period?`Q${e.status.period} ${e.status.displayClock}`:e.status?.type?.shortDetail||'In progress',round:playoffRound(e),week:e._week,tbd:e._type===2&&!completed&&e._week>=17})}}
-currentTeams=[...teams.values()].map(t=>({...t,pct:t.w+t.l+t.t?(t.w+t.t/2)/(t.w+t.l+t.t):0})).sort((a,b)=>b.pct-a.pct||b.w-a.w||(b.pf-b.pa)-(a.pf-a.pa)||a.name.localeCompare(b.name));render();lastSuccess=new Date();status.textContent=`Updated ${nowTime()} · ${events.size} games checked · All times Central${failures?` · ${failures} schedule requests unavailable`:''} · Auto-refresh every 15 sec`;
-}catch(err){status.innerHTML=`<span class="error">Unable to refresh: ${safe(err.message)}.</span> ${lastSuccess?'Showing previously loaded results.':'Check your connection and try again.'}`}
-finally{busy=false;refresh.disabled=false;refresh.classList.remove('spin')}}
-list.addEventListener('click',e=>{
-const tab=e.target.closest('button[data-tab]');
-if(tab){const id=tab.dataset.team;const next=savePanel(id,{tab:tab.dataset.tab==='roster'?'roster':'games'});if(next.tab==='roster')ensureRoster(id);render();return}
-const retry=e.target.closest('button[data-roster-retry]');
-if(retry){ensureRoster(retry.dataset.rosterRetry,{force:true});return}
-const summary=e.target.closest('.other-roster summary');
-if(summary){e.preventDefault();const id=summary.dataset.team;savePanel(id,{otherOpen:!panelFor(id).otherOpen});render();return}
-const btn=e.target.closest('button.team');
-if(!btn)return;const id=btn.dataset.id;if(expanded.has(id))expanded.delete(id);else{expanded.add(id);if(panelFor(id).tab==='roster')ensureRoster(id)}render()});
-list.addEventListener('error',e=>{const img=e.target;if(!img||!img.classList)return;if(img.classList.contains('score-logo')){img.remove();return}if(img.classList.contains('headshot')){const pid=img.dataset.pid;if(pid)headshotFailed.add(pid);const fallback=document.createElement('span');fallback.className='headshot-fallback';fallback.setAttribute('aria-hidden','true');fallback.textContent=img.dataset.initials||'?';img.replaceWith(fallback)}},true);
-refresh.addEventListener('click',load);document.addEventListener('visibilitychange',()=>{if(!document.hidden)load()});setInterval(()=>{if(!document.hidden)load()},15000);loadDraftCache();load();
-</script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Live NFL regular-season standings ranked by winning percentage, with scores, schedules, and depth charts.">
+<meta name="theme-color" content="#101827">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="NFL Standings">
+<meta property="og:title" content="NFL Standings">
+<meta property="og:description" content="Live NFL regular-season standings, scores, schedules, and depth charts.">
+<meta property="og:type" content="website">
+<title>NFL Standings</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23101827'/%3E%3Cpath d='M12 40Q32 10 52 40Q32 54 12 40Z' fill='%23f4f7fb' transform='rotate(-28 32 32)'/%3E%3Cpath d='M24 28l14 16M26 33l6-4M24 38l6-4M22 43l6-4' stroke='%23101827' stroke-width='2' stroke-linecap='round' transform='rotate(-28 32 32)'/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="styles.css">
+<script>
+try {
+  var stored = JSON.parse(localStorage.getItem('nfl-prefs-v1') || '{}');
+  var choice = stored.theme === 'light' || stored.theme === 'dark' ? stored.theme : (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+  document.documentElement.dataset.theme = choice;
+  var themeMeta = document.querySelector('meta[name="theme-color"]');
+  if (themeMeta) themeMeta.setAttribute('content', choice === 'light' ? '#e7eef6' : '#101827');
+} catch (error) { /* keep the default dark theme */ }
+</script>
+</head>
+<body>
+<main>
+  <div class="sticky">
+    <header>
+      <div class="brand">
+        <div>
+          <h1>NFL Standings</h1>
+          <p id="season">Regular season</p>
+          <p class="live-state" id="live-state"><span id="live-dot" class="live-dot" aria-hidden="true"></span><span id="live-label">Live</span></p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button type="button" id="theme-toggle">Dark</button>
+        <button type="button" id="refresh">Refresh now</button>
+      </div>
+    </header>
+    <div class="toolbar">
+      <label class="search"><span class="sr-only">Search teams</span><input id="search" type="search" placeholder="Search teams" autocomplete="off" enterkeyhint="search"></label>
+      <select id="conference" aria-label="Conference">
+        <option value="all">All conferences</option>
+        <option value="AFC">AFC</option>
+        <option value="NFC">NFC</option>
+      </select>
+      <select id="division" aria-label="Division">
+        <option value="all">All divisions</option>
+        <option value="AFC East">AFC East</option>
+        <option value="AFC North">AFC North</option>
+        <option value="AFC South">AFC South</option>
+        <option value="AFC West">AFC West</option>
+        <option value="NFC East">NFC East</option>
+        <option value="NFC North">NFC North</option>
+        <option value="NFC South">NFC South</option>
+        <option value="NFC West">NFC West</option>
+      </select>
+      <button type="button" id="live-only" aria-pressed="false">Live now</button>
+      <button type="button" id="settings-open">Settings</button>
+    </div>
+    <p class="meta" id="status" role="status">Loading latest results…</p>
+    <div id="banner" class="banner" role="alert" hidden></div>
+    <div id="live-strip" class="live-strip" hidden></div>
+    <p id="filter-status"></p>
+    <div class="head"><span>#</span><span>Team</span><span class="record-h">W-L-T</span><span></span></div>
+  </div>
+  <p id="empty" class="empty-state" hidden></p>
+  <div id="list" role="list" aria-label="NFL standings" aria-busy="true">
+    <div class="skeleton"></div>
+    <div class="skeleton"></div>
+    <div class="skeleton"></div>
+    <div class="skeleton"></div>
+    <div class="skeleton"></div>
+    <div class="skeleton"></div>
+  </div>
+  <footer>
+    <p>Sorted by winning percentage (ties count as half a win), then wins, point differential, and team name. Your pinned team stays on top. Regular-season standings only. Playoff and upcoming games are inside each team.</p>
+    <p>Data from <a href="https://www.espn.com/nfl/" rel="noopener noreferrer">ESPN</a>. Unofficial and may be delayed. This site is not affiliated with the NFL or ESPN.</p>
+  </footer>
+</main>
+<dialog id="settings" aria-labelledby="settings-title">
+  <h2 id="settings-title">Settings</h2>
+  <label class="settings-row"><input type="checkbox" id="auto-refresh" checked> Auto-refresh every 15 seconds</label>
+  <fieldset>
+    <legend>Theme</legend>
+    <label class="choice"><input type="radio" name="theme" value="system"> Match system</label>
+    <label class="choice"><input type="radio" name="theme" value="light"> Light</label>
+    <label class="choice"><input type="radio" name="theme" value="dark"> Dark</label>
+  </fieldset>
+  <p class="game-meta">Auto-refresh pauses while this tab is in the background and runs again when you come back. The last good standings stay on screen if a refresh fails.</p>
+  <div class="settings-actions"><button type="button" class="settings-close" id="settings-close">Close</button></div>
+</dialog>
+<p id="score-live" class="sr-only" aria-live="polite"></p>
+<p id="filter-live" class="sr-only" aria-live="polite"></p>
+<noscript><p>This standings board needs JavaScript to load live NFL data.</p></noscript>
+<script src="app.js" defer></script>
+</body>
+</html>

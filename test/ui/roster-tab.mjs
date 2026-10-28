@@ -135,6 +135,8 @@ const billsRoster = {
 function contentType(path) {
   const ext = extname(path);
   if (ext === '.html') return 'text/html; charset=utf-8';
+  if (ext === '.css') return 'text/css; charset=utf-8';
+  if (ext === '.js' || ext === '.mjs') return 'text/javascript; charset=utf-8';
   if (ext === '.svg') return 'image/svg+xml';
   if (ext === '.webmanifest') return 'application/manifest+json';
   if (ext === '.png') return 'image/png';
@@ -243,6 +245,11 @@ async function main() {
     await route.abort('failed');
   });
 
+  await page.route('**/a.espncdn.com/**', async route => {
+    const slug = (route.request().url().match(/\/([a-z0-9]+)\.png/i) || [])[1] || 'nfl';
+    const body = `<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" rx="16" fill="#16324f"/><text x="40" y="48" text-anchor="middle" fill="#fff" font-size="22" font-family="sans-serif">${slug.slice(0, 3).toUpperCase()}</text></svg>`;
+    await route.fulfill({ status: 200, contentType: 'image/svg+xml', body });
+  });
   await page.route('**/headshots/nfl/players/full/4432620.png', route => route.abort());
 
   try {
@@ -328,7 +335,7 @@ async function main() {
     assert((await mullens.locator('.meta-chip').first().innerText()) === '#14');
     assert(await page.locator('.other-roster .badge-starter').count() === 0, 'other roster has no starters');
 
-    await page.getByRole('button', { name: '↻ Refresh' }).click();
+    await page.getByRole('button', { name: 'Refresh now' }).click();
     await page.getByRole('status').getByText(/Updated/).waitFor();
     assert(await page.getByRole('tab', { name: 'Roster', selected: true }).count() === 1, 'refresh keeps the roster tab');
     assert(await page.locator('.player', { hasText: 'Trevor Lawrence' }).locator('.draft').innerText() === 'Drafted 2021 · Rd 1, Pk 1');
@@ -337,7 +344,7 @@ async function main() {
     await page.locator('.live-indicator').first().waitFor();
 
     await page.getByRole('tab', { name: 'Games' }).click();
-    await page.getByText('COMPLETED REGULAR-SEASON GAMES').waitFor();
+    await teamEntry(page, 'Jacksonville Jaguars').getByText('COMPLETED REGULAR-SEASON GAMES', { exact: true }).waitFor();
     await teamEntry(page, 'Jacksonville Jaguars').locator('.game', { hasText: 'Houston Texans' }).waitFor();
     assert(await page.getByText('ESPN depth chart').count() === 0);
     await jaguarsButton.click();
@@ -348,8 +355,11 @@ async function main() {
     const callsBeforeReload = draftCalls.length;
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.getByRole('status').getByText(/Updated/).waitFor();
-    await teamEntry(page, 'Jacksonville Jaguars').locator('button.team').click();
-    await page.getByRole('tab', { name: 'Roster' }).click();
+    const jagReload = teamEntry(page, 'Jacksonville Jaguars');
+    if ((await jagReload.locator('button.team').getAttribute('aria-expanded')) !== 'true') {
+      await jagReload.locator('button.team').click();
+    }
+    await jagReload.getByRole('tab', { name: 'Roster' }).click();
     await page.locator('.player', { hasText: 'Trevor Lawrence' }).locator('.draft', { hasText: 'Drafted 2021 · Rd 1, Pk 1' }).waitFor();
     assert(draftCalls.length === callsBeforeReload, 'localStorage should satisfy draft lookups after reload');
     await teamEntry(page, 'Jacksonville Jaguars').locator('button.team').click();
@@ -381,11 +391,14 @@ async function main() {
     await page.evaluate(() => localStorage.removeItem('nfl-draft-cache-v1'));
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.getByRole('status').getByText(/Updated/).waitFor();
-    await teamEntry(page, 'Jacksonville Jaguars').locator('button.team').click();
-    await page.getByRole('tab', { name: 'Roster' }).click();
-    await page.locator('.draft', { hasText: 'Draft unavailable' }).first().waitFor();
-    await page.getByText('Parker Washington').first().waitFor();
-    await page.getByRole('tab', { name: 'Games' }).click();
+    const jagAgain = teamEntry(page, 'Jacksonville Jaguars');
+    if ((await jagAgain.locator('button.team').getAttribute('aria-expanded')) !== 'true') {
+      await jagAgain.locator('button.team').click();
+    }
+    await jagAgain.getByRole('tab', { name: 'Roster' }).click();
+    await jagAgain.locator('.draft', { hasText: 'Draft unavailable' }).first().waitFor();
+    await jagAgain.getByText('Parker Washington').first().waitFor();
+    await jagAgain.getByRole('tab', { name: 'Games' }).click();
     await teamEntry(page, 'Jacksonville Jaguars').locator('.game', { hasText: 'Houston Texans' }).waitFor();
 
     assert(pageErrors.length === 0, pageErrors.join('\n'));
