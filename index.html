@@ -18,7 +18,8 @@
 <script>
 try {
   var stored = JSON.parse(localStorage.getItem('nfl-prefs-v1') || '{}');
-  var choice = stored.theme === 'light' || stored.theme === 'dark' ? stored.theme : (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+  var theme = stored && typeof stored === 'object' && !Array.isArray(stored) ? stored.theme : '';
+  var choice = theme === 'light' || theme === 'dark' ? theme : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   document.documentElement.dataset.theme = choice;
   var themeMeta = document.querySelector('meta[name="theme-color"]');
   if (themeMeta) themeMeta.setAttribute('content', choice === 'light' ? '#e7eef6' : '#101827');
@@ -62,7 +63,10 @@ try {
       <button type="button" id="live-only" aria-pressed="false">Live now</button>
       <button type="button" id="settings-open">Settings</button>
     </div>
-    <p class="meta" id="status" role="status">Loading latest results…</p>
+    <div class="status-line">
+      <p class="meta" id="status" role="status">Loading latest results…</p>
+      <p class="meta as-of" id="as-of" aria-hidden="true"></p>
+    </div>
     <div id="banner" class="banner" role="alert" hidden></div>
     <div id="live-strip" class="live-strip" hidden></div>
     <p id="filter-status"></p>
@@ -97,6 +101,6 @@ try {
 <p id="score-live" class="sr-only" aria-live="polite"></p>
 <p id="filter-live" class="sr-only" aria-live="polite"></p>
 <noscript><p>This standings board needs JavaScript to load live NFL data.</p></noscript>
-<script src="app.js" defer></script>
+<script type="module" src="app.js"></script>
 </body>
 </html>

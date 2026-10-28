@@ -1,46 +1,19 @@
+import {
+  accentFor,
+  computeStandings,
+  normalizeDraft,
+  safe,
+  sanitizeDraftCache,
+  sanitizePrefs,
+  seasonYear
+} from './logic.js';
+
 const BASE = 'https://nfl-live-data.josh-soudah.workers.dev';
 const PREFS_KEY = 'nfl-prefs-v1';
 const DRAFT_BATCH = 40;
 const DRAFT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const DRAFT_LS_KEY = 'nfl-draft-cache-v1';
-
-/* Built-in conference, division, and colors for all 32 clubs. ESPN's team
-   payload wins for color when it includes one; this map covers filters and
-   the accent when the feed omits them. */
-const TEAM_INFO = {
-  '1': { conference: 'NFC', division: 'South', color: '#a71930', alt: '#000000', city: 'Atlanta' },
-  '2': { conference: 'AFC', division: 'East', color: '#00338d', alt: '#c60c30', city: 'Buffalo' },
-  '3': { conference: 'NFC', division: 'North', color: '#0b162a', alt: '#c83803', city: 'Chicago' },
-  '4': { conference: 'AFC', division: 'North', color: '#fb4f14', alt: '#000000', city: 'Cincinnati' },
-  '5': { conference: 'AFC', division: 'North', color: '#ff3c00', alt: '#311d00', city: 'Cleveland' },
-  '6': { conference: 'NFC', division: 'East', color: '#041e42', alt: '#869397', city: 'Dallas' },
-  '7': { conference: 'AFC', division: 'West', color: '#fb4f14', alt: '#002244', city: 'Denver' },
-  '8': { conference: 'NFC', division: 'North', color: '#0076b6', alt: '#b0b7bc', city: 'Detroit' },
-  '9': { conference: 'NFC', division: 'North', color: '#203731', alt: '#ffb612', city: 'Green Bay' },
-  '10': { conference: 'AFC', division: 'South', color: '#4b92db', alt: '#0c2340', city: 'Tennessee' },
-  '11': { conference: 'AFC', division: 'South', color: '#002c5f', alt: '#a2aaad', city: 'Indianapolis' },
-  '12': { conference: 'AFC', division: 'West', color: '#e31837', alt: '#ffb81c', city: 'Kansas City' },
-  '13': { conference: 'AFC', division: 'West', color: '#a5acaf', alt: '#000000', city: 'Las Vegas' },
-  '14': { conference: 'NFC', division: 'West', color: '#003594', alt: '#ffa300', city: 'Los Angeles' },
-  '15': { conference: 'AFC', division: 'East', color: '#008e97', alt: '#fc4c02', city: 'Miami' },
-  '16': { conference: 'NFC', division: 'North', color: '#4f2683', alt: '#ffc62f', city: 'Minnesota' },
-  '17': { conference: 'AFC', division: 'East', color: '#002244', alt: '#c60c30', city: 'New England' },
-  '18': { conference: 'NFC', division: 'South', color: '#d3bc8d', alt: '#101820', city: 'New Orleans' },
-  '19': { conference: 'NFC', division: 'East', color: '#0b2265', alt: '#a71930', city: 'New York' },
-  '20': { conference: 'AFC', division: 'East', color: '#125740', alt: '#000000', city: 'New York' },
-  '21': { conference: 'NFC', division: 'East', color: '#004c54', alt: '#a5acaf', city: 'Philadelphia' },
-  '22': { conference: 'NFC', division: 'West', color: '#97233f', alt: '#000000', city: 'Arizona' },
-  '23': { conference: 'AFC', division: 'North', color: '#ffb612', alt: '#101820', city: 'Pittsburgh' },
-  '24': { conference: 'AFC', division: 'West', color: '#0080c6', alt: '#ffc20e', city: 'Los Angeles' },
-  '25': { conference: 'NFC', division: 'West', color: '#aa0000', alt: '#b3995d', city: 'San Francisco' },
-  '26': { conference: 'NFC', division: 'West', color: '#69be28', alt: '#002244', city: 'Seattle' },
-  '27': { conference: 'NFC', division: 'South', color: '#d50a0a', alt: '#ff7900', city: 'Tampa Bay' },
-  '28': { conference: 'NFC', division: 'East', color: '#ffb612', alt: '#5a1414', city: 'Washington' },
-  '29': { conference: 'NFC', division: 'South', color: '#0085ca', alt: '#101820', city: 'Carolina' },
-  '30': { conference: 'AFC', division: 'South', color: '#006778', alt: '#d7a22a', city: 'Jacksonville' },
-  '33': { conference: 'AFC', division: 'North', color: '#241773', alt: '#9e7c0c', city: 'Baltimore' },
-  '34': { conference: 'AFC', division: 'South', color: '#a71930', alt: '#03202f', city: 'Houston' }
-};
+const REQUEST_TIMEOUT_MS = 12000;
 
 const list = document.querySelector('#list');
 const statusEl = document.querySelector('#status');
@@ -63,8 +36,9 @@ const autoRefreshInput = document.querySelector('#auto-refresh');
 const themeInputs = [...document.querySelectorAll('input[name="theme"]')];
 
 const prefs = { theme: 'system', autoRefresh: true, favoriteId: null, expanded: [], tabs: {}, otherOpen: {} };
-let busy = false;
 let timer = 0;
+let loadGen = 0;
+let activeLoad = null;
 let booted = false;
 let lastSuccess = null;
 let lastFailures = 0;
@@ -83,69 +57,69 @@ const logoFailed = new Set();
 const draftMem = new Map();
 const draftPending = new Set();
 const draftFailed = new Set();
+const draftGen = new Map();
 
-function year() {
-  const date = new Date();
-  const y = date.getFullYear();
-  return date.getMonth() < 2 ? y - 1 : y;
-}
-const season = year();
+const season = seasonYear();
 document.querySelector('#season').textContent = `${season} Regular Season · Central time`;
+const asOf = document.querySelector('#as-of');
 
 /* Roster markup is the one place we still build HTML strings, so every
    interpolated value goes through safe(). Standings text uses textContent. */
-function safe(value) {
-  return String(value ?? '').replace(/[&<>"']/g, char => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[char]));
-}
 const fmt = date => new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Chicago' });
 const kickoff = date => new Date(date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago', timeZoneName: 'short' });
 function nowTime(date = new Date()) {
   return new Date(date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago', timeZoneName: 'short' });
 }
-async function json(url) {
-  const response = await fetch(url, { cache: 'no-store' });
-  if (!response.ok) throw new Error('HTTP ' + response.status + ' from NFL data service');
-  return response.json();
+function isDark() {
+  return document.documentElement.dataset.theme !== 'light';
 }
-function isLive(event) {
-  const type = event.status?.type || {};
-  return !type.completed && (type.state === 'in' || ['STATUS_IN_PROGRESS', 'STATUS_HALFTIME', 'STATUS_END_PERIOD', 'STATUS_DELAYED'].includes(type.name));
-}
-function playoffRound(event) {
-  const week = Number(event.week?.number || 0);
-  return ({ 1: 'Wild Card', 2: 'Divisional', 3: 'Conference Championship', 4: 'Pro Bowl', 5: 'Super Bowl' })[week] || event.week?.text || 'Playoffs';
-}
-function cssColor(value, fallback) {
-  const raw = String(value || '').trim().replace(/^#/, '');
-  return /^[0-9a-fA-F]{6}$/.test(raw) ? '#' + raw.toLowerCase() : fallback;
-}
-function luminance(hex) {
-  const n = parseInt(String(hex).replace('#', ''), 16);
-  if (!Number.isFinite(n)) return 0;
-  return (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255;
-}
-function lighten(hex, amount) {
-  const n = parseInt(String(hex).replace('#', ''), 16);
-  const channel = value => Math.max(0, Math.min(255, Math.round(value + (255 - value) * amount)));
-  const r = channel((n >> 16) & 255);
-  const g = channel((n >> 8) & 255);
-  const b = channel(n & 255);
-  return '#' + [r, g, b].map(value => value.toString(16).padStart(2, '0')).join('');
-}
-function accentFor(team) {
-  const dark = document.documentElement.dataset.theme !== 'light';
-  const primary = team.color || '#5b6b82';
-  const alt = team.alt || '#8aa0bd';
-  if (dark) {
-    if (luminance(primary) >= 0.28) return primary;
-    if (luminance(alt) >= 0.28) return alt;
-    return lighten(primary, 0.55);
+function requestTimeoutMs() {
+  const host = location.hostname;
+  if (host === 'localhost' || host === '127.0.0.1') {
+    const value = Number(new URLSearchParams(location.search).get('timeout'));
+    if (Number.isFinite(value) && value >= 200 && value <= 30000) return value;
   }
-  if (luminance(primary) <= 0.72) return primary;
-  if (luminance(alt) <= 0.72) return alt;
-  return '#1d4e89';
+  return REQUEST_TIMEOUT_MS;
+}
+/* Parent abort (a newer refresh) and the timeout share one signal. A timed-out
+   refresh still reports an error. A replaced refresh is ignored. */
+function withTimeout(parent) {
+  const controller = new AbortController();
+  const ms = requestTimeoutMs();
+  const timerId = setTimeout(() => {
+    if (!controller.signal.aborted) controller.abort(new DOMException('The NFL data service timed out', 'TimeoutError'));
+  }, ms);
+  const onParent = () => {
+    if (!controller.signal.aborted) controller.abort(parent.reason);
+  };
+  if (parent) {
+    if (parent.aborted) onParent();
+    else parent.addEventListener('abort', onParent);
+  }
+  const cancel = () => {
+    clearTimeout(timerId);
+    if (parent) parent.removeEventListener('abort', onParent);
+  };
+  return { signal: controller.signal, cancel };
+}
+async function json(url, signal) {
+  const timed = withTimeout(signal);
+  try {
+    const response = await fetch(url, { cache: 'no-store', signal: timed.signal });
+    if (!response.ok) throw new Error('HTTP ' + response.status + ' from NFL data service');
+    try {
+      return await response.json();
+    } catch {
+      throw new Error('The NFL data service returned an unreadable response');
+    }
+  } catch (error) {
+    if (error && (error.name === 'TimeoutError' || (error.name === 'AbortError' && !String(error.message).toLowerCase().includes('superseded')))) {
+      throw new DOMException('The NFL data service timed out', 'TimeoutError');
+    }
+    throw error;
+  } finally {
+    timed.cancel();
+  }
 }
 function h(tag, attrs, children) {
   const el = document.createElement(tag);
@@ -198,7 +172,7 @@ function rankOf(id) {
   return index < 0 ? 0 : index + 1;
 }
 function gameKey(game) {
-  return `${game.type}|${game.week}|${game.date}|${game.opponent}`;
+  return String(game.id || `${game.type}|${game.week}|${game.date}|${game.opponent}`);
 }
 function fnv1a(text) {
   let hash = 0x811c9dc5;
@@ -214,7 +188,7 @@ function payloadJson(teams) {
     team.games.map(game => [
       game.type, game.week, game.date, game.opponent, game.myScore, game.otherScore, game.result,
       game.completed, game.live, game.clock, game.tbd, game.away, game.myAbbr, game.otherAbbr,
-      game.myLogo, game.otherLogo, game.round, game.myName
+      game.myLogo, game.otherLogo, game.round, game.myName, game.id
     ])
   ]));
 }
@@ -225,13 +199,7 @@ function pageHidden() {
 function loadPrefs() {
   try {
     const raw = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
-    if (!raw || typeof raw !== 'object') return;
-    if (raw.theme === 'light' || raw.theme === 'dark' || raw.theme === 'system') prefs.theme = raw.theme;
-    prefs.autoRefresh = raw.autoRefresh !== false;
-    prefs.favoriteId = raw.favoriteId ? String(raw.favoriteId) : null;
-    prefs.expanded = Array.isArray(raw.expanded) ? raw.expanded.map(String) : [];
-    prefs.tabs = raw.tabs && typeof raw.tabs === 'object' ? raw.tabs : {};
-    prefs.otherOpen = raw.otherOpen && typeof raw.otherOpen === 'object' ? raw.otherOpen : {};
+    Object.assign(prefs, sanitizePrefs(raw));
   } catch { /* private mode or unreadable storage */ }
 }
 function hydratePanels() {
@@ -274,7 +242,7 @@ function applyTheme() {
   for (const section of list.querySelectorAll('.entry')) {
     const team = teamById(section.dataset.teamId);
     if (!team) continue;
-    const accent = accentFor(team);
+    const accent = accentFor(team, isDark());
     if (section.style.getPropertyValue('--team') !== accent) section.style.setProperty('--team', accent);
   }
 }
@@ -335,7 +303,10 @@ function announceFilters() {
   const shown = [...list.querySelectorAll('.entry')].filter(el => !el.hidden).length;
   filterStatus.textContent = currentTeams.length ? `Showing ${shown} of ${currentTeams.length} teams` : '';
   empty.hidden = shown !== 0 || !currentTeams.length;
-  if (!empty.hidden && currentTeams.length) empty.textContent = 'No teams match those filters.';
+  if (!empty.hidden && currentTeams.length) {
+    const query = search.value.trim();
+    empty.textContent = query ? `No teams match "${query}".` : 'No teams match those filters.';
+  }
   clearTimeout(filterAnnounce);
   filterAnnounce = setTimeout(() => { filterLive.textContent = filterStatus.textContent; }, 250);
 }
@@ -389,7 +360,7 @@ function patchScore(box, game) {
   setText(box.querySelector('.opp-pts'), game.otherScore, { flash: true });
 }
 function buildGameRow() {
-  return h('div', { class: 'game' }, [
+  const row = h('div', { class: 'game' }, [
     h('div', { class: 'game-info' }, [
       h('div', { class: 'game-line' }, [
         h('span', { class: 'when' }),
@@ -406,6 +377,8 @@ function buildGameRow() {
       h('div', { class: 'game-meta clock' })
     ])
   ]);
+  row.querySelectorAll('img').forEach(img => { img.loading = 'lazy'; });
+  return row;
 }
 function patchGame(row, game, kind) {
   const kindClass = kind === 'playoff' ? 'playoff' : kind === 'upcoming' ? 'upcoming' : '';
@@ -614,7 +587,7 @@ function patchSection(section, team, rank) {
   const fav = prefs.favoriteId === team.id;
   section.classList.toggle('live-team', !!live);
   section.classList.toggle('is-fav', fav);
-  const accent = accentFor(team);
+  const accent = accentFor(team, isDark());
   if (section.style.getPropertyValue('--team') !== accent) section.style.setProperty('--team', accent);
   setText(section.querySelector('.rank'), String(rank), { flash: true });
   const logo = section.querySelector('.team-logo');
@@ -763,29 +736,38 @@ function announceScores(previous, next) {
       if (!game.live && !game.completed) continue;
       const prior = oldGames.get(gameKey(game));
       if (!prior) continue;
-      if (prior.myScore !== game.myScore || prior.otherScore !== game.otherScore || prior.clock !== game.clock) {
-        messages.push(`${game.myAbbr} ${game.myScore}, ${game.otherAbbr} ${game.otherScore}${game.live ? ', ' + game.clock : ''}`);
-      }
+      const changed = prior.myScore !== game.myScore || prior.otherScore !== game.otherScore || prior.live !== game.live || prior.completed !== game.completed;
+      if (!changed) continue;
+      const suffix = game.live && game.clock ? ', ' + game.clock : game.completed ? ', final' : '';
+      messages.push(`${game.myAbbr} ${game.myScore}, ${game.otherAbbr} ${game.otherScore}${suffix}`);
     }
   }
   if (!messages.length) return;
   const text = messages.slice(0, 3).join('. ');
   if (scoreLive.textContent !== text) scoreLive.textContent = text;
 }
-function noteSuccess(failures, gameCount) {
+function noteSuccess(failures, gameCount, manual = false) {
   lastSuccess = new Date();
+  const auto = prefs.autoRefresh ? 'refreshes every 15s' : 'auto-refresh off';
+  const miss = failures ? ` · ${failures} week${failures === 1 ? '' : 's'} unavailable` : '';
+  /* The visible clock sits outside the live region so a 15s refresh does not
+     speak. The status sentence changes only on a manual refresh or when the
+     counts themselves change. */
+  const stable = `Updated · ${gameCount} games checked · Central time${miss} · ${auto}`;
+  const clock = nowTime();
+  if (asOf && asOf.textContent !== clock) asOf.textContent = clock;
+  if (manual || statusEl.textContent !== stable) statusEl.textContent = stable;
   lastFailures = failures;
   lastGameCount = gameCount;
   banner.hidden = true;
   banner.textContent = '';
-  const auto = prefs.autoRefresh ? 'refreshes every 15s' : 'auto-refresh off';
-  const miss = failures ? ` · ${failures} weeks unavailable` : '';
-  statusEl.textContent = `Updated ${nowTime()} · ${gameCount} games checked · Central time${miss} · ${auto}`;
   const shown = [...list.querySelectorAll('.entry')].filter(el => !el.hidden).length;
-  filterStatus.textContent = `Showing ${shown} of ${currentTeams.length} teams`;
-  if (shown === 0) {
+  const filterText = currentTeams.length ? `Showing ${shown} of ${currentTeams.length} teams` : '';
+  if (filterStatus.textContent !== filterText) filterStatus.textContent = filterText;
+  if (shown === 0 && currentTeams.length) {
     empty.hidden = false;
-    empty.textContent = 'No teams match those filters.';
+    const query = search.value.trim();
+    empty.textContent = query ? `No teams match "${query}".` : 'No teams match those filters.';
   } else empty.hidden = true;
 }
 function failLoad(err) {
@@ -794,6 +776,7 @@ function failLoad(err) {
   banner.textContent = lastSuccess
     ? `Unable to refresh: ${message}. Showing the last good update.`
     : `Unable to refresh: ${message}. Check your connection and try again.`;
+  if (asOf) asOf.textContent = '';
   statusEl.textContent = lastSuccess ? `Last good update ${nowTime(lastSuccess)}` : 'Update failed';
   if (!list.querySelector('.entry')) {
     list.querySelectorAll('.skeleton').forEach(node => node.remove());
@@ -803,106 +786,41 @@ function failLoad(err) {
   }
 }
 
+function superseded(error) {
+  return !!(error && error.name === 'AbortError' && String(error.message).toLowerCase().includes('superseded'));
+}
+
 async function load(manual = false) {
-  if (busy) return;
-  busy = true;
-  refresh.disabled = true;
+  const gen = ++loadGen;
+  if (activeLoad) activeLoad.abort(new DOMException('superseded', 'AbortError'));
+  const controller = new AbortController();
+  activeLoad = controller;
   refresh.setAttribute('aria-busy', 'true');
   // Automatic refreshes keep the current status line so the page does not
   // announce "checking" every 15 seconds. A manual refresh still swaps it,
   // which is also how the UI test waits for the round trip to finish.
   if (manual || !list.querySelector('.entry')) statusEl.textContent = 'Checking ESPN for the latest results…';
   try {
-    const requests = [json(`${BASE}/teams?limit=40`)];
-    for (let week = 1; week <= 18; week++) requests.push(json(`${BASE}/scoreboard?season=${season}&seasontype=2&week=${week}&limit=30`));
-    for (let week = 1; week <= 5; week++) requests.push(json(`${BASE}/scoreboard?season=${season}&seasontype=3&week=${week}&limit=30`));
+    const requests = [json(`${BASE}/teams?limit=40`, controller.signal)];
+    for (let week = 1; week <= 18; week++) requests.push(json(`${BASE}/scoreboard?season=${season}&seasontype=2&week=${week}&limit=30`, controller.signal));
+    for (let week = 1; week <= 5; week++) requests.push(json(`${BASE}/scoreboard?season=${season}&seasontype=3&week=${week}&limit=30`, controller.signal));
     const responses = await Promise.allSettled(requests);
+    if (gen !== loadGen) return;
     if (responses[0].status !== 'fulfilled') throw responses[0].reason;
-    const rawTeams = responses[0].value.sports?.[0]?.leagues?.[0]?.teams || [];
-    if (rawTeams.length < 32) throw new Error('Could not retrieve all 32 teams');
-    const teams = new Map(rawTeams.map(item => {
-      const raw = item.team;
-      const info = TEAM_INFO[String(raw.id)] || { conference: 'NFL', division: '', color: '#5b6b82', alt: '#8aa0bd', city: '' };
-      return [String(raw.id), {
-        id: String(raw.id),
-        name: raw.displayName,
-        abbr: raw.abbreviation || '',
-        logo: raw.logos?.[0]?.href || raw.logo || '',
-        color: cssColor(raw.color, info.color),
-        alt: cssColor(raw.alternateColor, info.alt),
-        conference: info.conference,
-        division: info.division,
-        city: info.city,
-        w: 0, l: 0, t: 0, pf: 0, pa: 0,
-        games: []
-      }];
-    }));
-    const events = new Map();
-    let failures = 0;
-    for (let i = 1; i < responses.length; i++) {
-      const response = responses[i];
-      if (response.status !== 'fulfilled') { failures++; continue; }
-      const expectedType = i <= 18 ? 2 : 3;
-      for (const event of response.value.events || []) {
-        if (expectedType === 2 && Number(event.week?.number || event.weekNumber || i) !== i) continue;
-        const actualType = Number(event.season?.type || expectedType);
-        if (actualType !== expectedType) continue;
-        events.set(`${actualType}:${event.id}`, { ...event, _type: actualType, _week: expectedType === 2 ? i : i - 18 });
-      }
-    }
-    if (!events.size) throw new Error('No NFL schedule data available');
-    for (const event of events.values()) {
-      const competitors = event.competitions?.[0]?.competitors || [];
-      if (competitors.length !== 2) continue;
-      const [a, b] = competitors;
-      if (!teams.has(String(a.id)) || !teams.has(String(b.id))) continue;
-      const completed = !!event.status?.type?.completed;
-      const live = isLive(event);
-      const scoreA = Number(a.score);
-      const scoreB = Number(b.score);
-      if (completed && (!Number.isFinite(scoreA) || !Number.isFinite(scoreB))) continue;
-      for (const [me, other, myScore, otherScore] of [[a, b, scoreA, scoreB], [b, a, scoreB, scoreA]]) {
-        const team = teams.get(String(me.id));
-        const opp = teams.get(String(other.id));
-        const result = completed ? (myScore > otherScore ? 'W' : myScore < otherScore ? 'L' : 'T') : null;
-        if (completed && event._type === 2) {
-          team[result.toLowerCase()]++;
-          team.pf += myScore;
-          team.pa += otherScore;
-        }
-        team.games.push({
-          type: event._type,
-          date: event.date,
-          opponent: other.team?.displayName || opp.name || 'Opponent',
-          myName: me.team?.displayName || team.name,
-          myAbbr: me.team?.abbreviation || team.abbr || '',
-          otherAbbr: other.team?.abbreviation || opp.abbr || '',
-          myLogo: team.logo || me.team?.logo || '',
-          otherLogo: opp.logo || other.team?.logo || '',
-          away: me.homeAway === 'away',
-          myScore: Number.isFinite(myScore) ? myScore : 0,
-          otherScore: Number.isFinite(otherScore) ? otherScore : 0,
-          result,
-          completed,
-          live,
-          clock: event.status?.displayClock && event.status?.period ? `Q${event.status.period} ${event.status.displayClock}` : event.status?.type?.shortDetail || 'In progress',
-          round: playoffRound(event),
-          week: event._week,
-          tbd: event._type === 2 && !completed && event._week >= 17
-        });
-      }
-    }
-    const next = [...teams.values()].map(team => {
-      const played = team.w + team.l + team.t;
-      return { ...team, pct: played ? (team.w + team.t / 2) / played : 0 };
-    }).sort((a, b) => b.pct - a.pct || b.w - a.w || (b.pf - b.pa) - (a.pf - a.pa) || a.name.localeCompare(b.name));
+    const weekPayloads = responses.slice(1).map(response => (
+      response.status === 'fulfilled' ? { ok: true, body: response.value } : { ok: false }
+    ));
+    const computed = computeStandings(responses[0].value, weekPayloads);
+    if (!computed.ok) throw new Error(computed.error);
+    const next = computed.teams;
+    const failures = computed.failures;
     const jsonText = payloadJson(next);
     const hash = fnv1a(jsonText);
     const previous = currentTeams;
     currentTeams = next;
     /* Same payload as last time: leave every DOM node, image, and scroll position alone. */
     if (hash === lastHash && jsonText === lastPayloadJson && list.querySelector('.entry')) {
-      noteSuccess(failures, events.size);
+      noteSuccess(failures, computed.gameCount, manual);
       return;
     }
     lastHash = hash;
@@ -910,14 +828,17 @@ async function load(manual = false) {
     announceScores(previous, next);
     syncLiveStrip();
     syncList();
-    noteSuccess(failures, events.size);
+    noteSuccess(failures, computed.gameCount, manual);
   } catch (err) {
+    if (gen !== loadGen || superseded(err)) return;
     failLoad(err);
   } finally {
-    busy = false;
-    refresh.disabled = false;
-    refresh.removeAttribute('aria-busy');
-    updateLiveState();
+    if (gen === loadGen) {
+      if (activeLoad === controller) activeLoad = null;
+      refresh.disabled = false;
+      refresh.removeAttribute('aria-busy');
+      updateLiveState();
+    }
   }
 }
 
@@ -945,24 +866,14 @@ function expLabel(years) {
   if (n <= 0) return 'Rookie';
   return n === 1 ? '1 yr' : n + ' yrs';
 }
-function normalizeDraft(draft) {
-  if (draft == null || typeof draft !== 'object') return null;
-  const draftYear = Number(draft.year);
-  if (!Number.isFinite(draftYear)) return null;
-  const round = Number(draft.round);
-  const pick = Number(draft.pick);
-  return { year: draftYear, round: Number.isFinite(round) ? round : null, pick: Number.isFinite(pick) ? pick : null };
-}
 function loadDraftCache() {
   try {
     const raw = JSON.parse(localStorage.getItem(DRAFT_LS_KEY) || '{}');
-    const now = Date.now();
-    let changed = false;
-    for (const [id, rec] of Object.entries(raw)) {
-      if (!rec || typeof rec !== 'object' || !(rec.exp > now) || !('draft' in rec)) { changed = true; continue; }
-      draftMem.set(id, { draft: normalizeDraft(rec.draft), exp: rec.exp });
-    }
-    if (changed) persistDrafts();
+    const entries = sanitizeDraftCache(raw, Date.now());
+    draftMem.clear();
+    for (const entry of entries) draftMem.set(entry.id, { draft: entry.draft, exp: entry.exp });
+    const kept = Object.fromEntries(entries.map(entry => [entry.id, { draft: entry.draft, exp: entry.exp }]));
+    if (JSON.stringify(raw) !== JSON.stringify(kept)) persistDrafts();
   } catch { /* private mode or unreadable storage */ }
 }
 function persistDrafts() {
@@ -1010,7 +921,14 @@ function collectIds(data) {
   return ids;
 }
 async function fetchDraftBatch(ids) {
-  for (const id of ids) draftPending.add(id);
+  const stamp = new Map();
+  for (const id of ids) {
+    const next = (draftGen.get(id) || 0) + 1;
+    draftGen.set(id, next);
+    stamp.set(id, next);
+    draftPending.add(id);
+  }
+  const current = id => draftGen.get(id) === stamp.get(id);
   try {
     const response = await fetch(`${BASE}/draft?ids=${ids.map(encodeURIComponent).join(',')}`, { cache: 'no-store' });
     let data = null;
@@ -1018,6 +936,7 @@ async function fetchDraftBatch(ids) {
     const usable = response.ok && data && typeof data === 'object' && !Array.isArray(data) && !(data.message && data.endpoints);
     const now = Date.now();
     for (const id of ids) {
+      if (!current(id)) continue;
       draftPending.delete(id);
       if (!usable || !Object.prototype.hasOwnProperty.call(data, id)) { draftFailed.add(id); continue; }
       const value = data[id];
@@ -1025,9 +944,13 @@ async function fetchDraftBatch(ids) {
       else if (typeof value === 'object' && Number.isFinite(Number(value.year))) draftMem.set(id, { draft: normalizeDraft(value), exp: now + DRAFT_TTL_MS });
       else draftFailed.add(id);
     }
-    if (usable) persistDrafts();
+    if (usable && ids.some(current)) persistDrafts();
   } catch {
-    for (const id of ids) { draftPending.delete(id); draftFailed.add(id); }
+    for (const id of ids) {
+      if (!current(id)) continue;
+      draftPending.delete(id);
+      draftFailed.add(id);
+    }
   }
   applyDraftDom();
 }
@@ -1039,7 +962,11 @@ async function fillDrafts(ids) {
   await Promise.all(batches.map(fetchDraftBatch));
 }
 function clearDraftFailures(ids) {
-  for (const id of ids) draftFailed.delete(id);
+  for (const id of ids) {
+    draftFailed.delete(id);
+    draftPending.delete(id);
+    draftGen.set(id, (draftGen.get(id) || 0) + 1);
+  }
 }
 function rosterSignature(id) {
   const record = rosters.get(id);
@@ -1093,11 +1020,6 @@ function rosterHtml(team) {
   }
   return html;
 }
-function bindHeadshots(root) {
-  root.querySelectorAll('img.headshot').forEach(img => {
-    img.addEventListener('error', () => onHeadshotError(img));
-  });
-}
 function paintRoster(id) {
   const team = teamById(id);
   if (!team) return;
@@ -1110,7 +1032,6 @@ function paintRoster(id) {
     root.dataset.sig = sig;
     try { root.innerHTML = rosterHtml(team); }
     catch { root.innerHTML = '<div class="empty error">Could not show this roster.</div>'; }
-    bindHeadshots(root);
     parked.set(id, root);
     if (previous && previous.isConnected) previous.replaceWith(root);
   }
@@ -1266,6 +1187,7 @@ window.addEventListener('offline', () => {
     : 'You are offline. Standings will load when you reconnect.';
 });
 window.addEventListener('online', () => {
+  if (pageHidden()) return;
   if (prefs.autoRefresh) load();
   else if (lastSuccess) { banner.hidden = true; banner.textContent = ''; }
 });
@@ -1277,7 +1199,13 @@ function registerShellWorker() {
   if (!('serviceWorker' in navigator)) return;
   const host = location.hostname;
   if (host === 'localhost' || host === '127.0.0.1') return;
-  navigator.serviceWorker.register('./sw.js').catch(() => {});
+  /* updateViaCache none so a new sw.js is noticed on the next load, not a day later.
+     Scope is the service worker's own directory, which is /nfl-dashboard/ on Pages. */
+  navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).catch(() => {});
+}
+
+if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+  globalThis.__nflTest = { ensureRoster, load };
 }
 
 loadPrefs();

@@ -2,6 +2,8 @@
    head script can set them before first paint. No external images or fonts. */
 :root {
   color-scheme: dark;
+  --pad-l: max(16px, env(safe-area-inset-left));
+  --pad-r: max(16px, env(safe-area-inset-right));
   --bg: #07101c;
   --bg-raise: #101a2b;
   --sticky: rgba(8, 16, 30, .94);
@@ -44,10 +46,10 @@ html[data-theme="light"] {
   --focus: #1d4e89;
   --button: #1d4e89;
   --button-text: #fff;
-  --good: #0c7a45;
+  --good: #0b6b3c;
   --bad: #a32018;
   --tie: #8a5a00;
-  --gold: #8a6200;
+  --gold: #6e4e00;
   --danger-bg: #fff1f1;
   --danger-text: #7a1d1d;
   --danger-border: #e4aaaa;
@@ -109,16 +111,19 @@ button { cursor: pointer; }
 main {
   max-width: 880px;
   margin: 0 auto;
-  padding: calc(env(safe-area-inset-top) + 12px) 16px 48px;
+  padding:
+    calc(env(safe-area-inset-top) + 12px)
+    var(--pad-r)
+    calc(48px + env(safe-area-inset-bottom))
+    var(--pad-l);
 }
 .sticky {
   position: sticky;
   top: 0;
   z-index: 5;
-  margin: 0 -16px;
-  padding: 8px 16px 6px;
+  margin: 0 calc(var(--pad-r) * -1) 0 calc(var(--pad-l) * -1);
+  padding: 8px var(--pad-r) 6px var(--pad-l);
   background: var(--sticky);
-  backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--line);
 }
 header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
@@ -180,8 +185,17 @@ html[data-theme="light"] #live-only[aria-pressed="true"] {
   color: #085c34;
   border-color: #8dcfb0;
 }
-#status, #filter-status { color: var(--muted); font-size: 13px; }
-#status { min-height: 2.8em; margin: 10px 0 4px; }
+#status, #filter-status, .as-of { color: var(--muted); font-size: 13px; }
+.status-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  align-items: baseline;
+  min-height: 2.8em;
+  margin: 10px 0 4px;
+}
+#status, .as-of { margin: 0; }
+.as-of { font-variant-numeric: tabular-nums; min-width: 8.5em; }
 #filter-status { min-height: 1.2em; margin: 0 0 6px; }
 .banner {
   margin: 8px 0;
@@ -197,6 +211,7 @@ html[data-theme="light"] #live-only[aria-pressed="true"] {
   align-items: center;
   gap: 6px;
   min-height: 44px;
+  max-width: 100%;
   padding: 6px 10px;
   border-radius: 999px;
   border: 1px solid #1f7a52;
@@ -271,7 +286,7 @@ html[data-theme="light"] .live-chip { background: #e5f8ee; color: #085c34; }
 }
 .live-pill { color: #062416; background: #8ee8b4; }
 .mine { color: #2a2108; background: #f6d36b; }
-.record { text-align: right; font-weight: 800; }
+.record { text-align: right; font-weight: 800; white-space: nowrap; }
 .arrow {
   width: 16px;
   height: 16px;
@@ -296,7 +311,7 @@ html[data-theme="light"] .live-chip { background: #e5f8ee; color: #085c34; }
   font-size: 22px;
   line-height: 1;
 }
-.fav.on { color: #e2b93b; }
+.fav.on { color: var(--gold); }
 
 .panel { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .22s ease; }
 .panel.open { grid-template-rows: 1fr; }
@@ -320,7 +335,7 @@ html[data-theme="light"] .live-chip { background: #e5f8ee; color: #085c34; }
   letter-spacing: .07em;
   color: var(--muted);
 }
-.section-title.playoff-title { color: #e9b96e; }
+.section-title.playoff-title { color: var(--gold); }
 .section-title.upcoming-title { color: var(--accent); }
 .section-title.live-title { color: var(--good); }
 .game {
@@ -342,7 +357,7 @@ html[data-theme="light"] .live-chip { background: #e5f8ee; color: #085c34; }
 .game-score { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; text-align: right; flex: none; }
 .badge { font-size: 10px; font-weight: 800; letter-spacing: .04em; color: var(--accent); }
 .game.is-live .badge, .live-title { color: var(--good); }
-.game.playoff .badge { color: #e9b96e; }
+.game.playoff .badge { color: var(--gold); }
 .W { color: var(--good); }
 .L { color: var(--bad); }
 .T { color: var(--tie); }
@@ -358,8 +373,8 @@ html[data-theme="light"] .live-chip { background: #e5f8ee; color: #085c34; }
   font-size: 12px;
   font-weight: 700;
   line-height: 1.1;
-  white-space: nowrap;
 }
+.name, .sub, .live-indicator, .chip-text, .opp { overflow-wrap: break-word; }
 .scorebox.has-result { grid-template-columns: 15px auto auto auto; }
 .row-score { margin-top: 4px; }
 .logo-slot { width: 15px; height: 15px; display: flex; align-items: center; justify-content: center; }
@@ -409,9 +424,11 @@ html[data-theme="light"] .live-chip { background: #e5f8ee; color: #085c34; }
   animation: shimmer 1.3s ease infinite;
 }
 footer { margin-top: 22px; color: var(--muted); font-size: 12px; line-height: 1.5; }
-footer a { color: var(--accent); }
+footer a { color: var(--accent); display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; }
 dialog {
   width: min(440px, calc(100% - 24px));
+  max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 24px);
+  overflow: auto;
   border: 1px solid var(--line);
   border-radius: 16px;
   background: var(--card-solid);
@@ -440,18 +457,37 @@ html.booting .panel { transition: none; }
   .search { flex-basis: 100%; }
   .toolbar select, .toolbar > button { flex: 1 1 calc(50% - 8px); }
 }
+@media (max-width: 799px) {
+  .sticky { background: var(--bg-raise); }
+  body::before { display: none; }
+}
 @media (max-width: 640px) {
-  main { padding-left: 12px; padding-right: 12px; }
-  .sticky { margin: 0 -12px; padding-left: 12px; padding-right: 12px; }
+  :root {
+    --pad-l: max(12px, env(safe-area-inset-left));
+    --pad-r: max(12px, env(safe-area-inset-right));
+  }
   .header-actions { width: 100%; }
   header { flex-wrap: wrap; }
   .header-actions button { flex: 1; }
+  .team {
+    grid-template-columns: 22px minmax(0, 1fr) 64px 12px;
+    gap: 6px;
+    padding: 8px 48px 8px 10px;
+  }
+  .head {
+    grid-template-columns: 22px minmax(0, 1fr) 64px 12px;
+    gap: 6px;
+    padding: 6px 48px 6px 10px;
+  }
+  .logo-frame, .team-logo { width: 32px; height: 32px; }
+  .identity { gap: 8px; }
   .game { flex-direction: column; align-items: flex-start; }
   .game-score { align-items: flex-start; text-align: left; }
   .name { font-size: 14px; }
 }
 @media (min-width: 800px) {
-  #status { min-height: 1.35em; }
+  .status-line { min-height: 1.35em; }
+  .sticky { backdrop-filter: blur(10px); }
   .entry { backdrop-filter: blur(8px); }
 }
 @media (prefers-reduced-motion: reduce) {
