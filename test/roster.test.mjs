@@ -14,8 +14,11 @@ import {
   draftFromAthlete,
   joinRoster,
   mapPool,
+  normalizeTeamStats,
   parseDraftIds,
-  parseTeamId
+  parseTeamId,
+  STATS_CACHE_SECONDS,
+  statCategories
 } from '../worker/worker.js';
 
 const root = dirname(fileURLToPath(import.meta.url));
@@ -24,6 +27,7 @@ const depth = JSON.parse(readFileSync(join(root, 'fixtures/dc_site30.json'), 'ut
 const athlete = JSON.parse(readFileSync(join(root, 'fixtures/ath.json'), 'utf8'));
 const undraftedAthlete = JSON.parse(readFileSync(join(root, 'fixtures/ath-undrafted.json'), 'utf8'));
 const liveRoster = JSON.parse(readFileSync(join(root, 'fixtures/roster-live-30.json'), 'utf8'));
+const statsFixture = JSON.parse(readFileSync(join(root, 'fixtures/stats30.json'), 'utf8'));
 
 function flatten(joined) {
   const rows = [];
@@ -393,7 +397,7 @@ test('roster route joins, caches for two hours, and keeps the old proxy', async 
 
   const root = await handler(new Request('https://nfl.example/'));
   const described = await root.json();
-  assert.deepEqual(described.endpoints, ['/teams', '/scoreboard', '/standings', '/roster', '/draft']);
+  assert.deepEqual(described.endpoints, ['/teams', '/scoreboard', '/standings', '/roster', '/draft', '/stats']);
   assert.equal(described.message, 'NFL Data API is running');
 });
 
@@ -416,6 +420,165 @@ test('roster failures are not cached', async () => {
   assert.equal(cache.store.size, 0);
 });
 
+test('stats route normalizes the saved ESPN payload with one fetch and no Cache API', async () => {
+  const calls = [];
+  let cacheHits = 0;
+  const cache = memoryCache();
+  const match = cache.match.bind(cache);
+  const put = cache.put.bind(cache);
+  cache.match = async (...args) => { cacheHits += 1; return match(...args); };
+  cache.put = async (...args) => { cacheHits += 1; return put(...args); };
+  const handler = createHandler({
+    fetch: async (url, init) => {
+      calls.push({ url: String(url), init });
+      return Response.json(statsFixture);
+    },
+    cache
+  });
+
+  const blocked = await handler(new Request('https://nfl.example/stats?team=30', {
+    headers: { Origin: 'https://evil.example' }
+  }));
+  assert.equal(blocked.status, 403);
+  assert.equal(calls.length, 0);
+
+  const missing = await handler(new Request('https://nfl.example/stats'));
+  assert.equal(missing.status, 400);
+  const high = await handler(new Request('https://nfl.example/stats?team=35'));
+  assert.equal(high.status, 400);
+  assert.equal(calls.length, 0);
+
+  const response = await handler(new Request('https://nfl.example/stats?team=30', {
+    headers: { Origin: ALLOWED_ORIGIN }
+  }));
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('Access-Control-Allow-Origin'), ALLOWED_ORIGIN);
+  assert.equal(response.headers.get('Cache-Control'), `public, max-age=${STATS_CACHE_SECONDS}`);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].init.cf.cacheTtl, STATS_CACHE_SECONDS);
+  assert.equal(calls[0].init.cf.cacheEverything, true);
+  assert.match(calls[0].url, /\/apis\/site\/v2\/sports\/football\/nfl\/teams\/30\/statistics$/);
+  assert.equal(cacheHits, 0);
+
+  const body = await response.json();
+  assert.equal(body.team.id, '30');
+  assert.equal(body.team.abbreviation, 'JAX');
+  assert.equal(body.team.name, 'Jacksonville Jaguars');
+  assert.equal(body.season, 2026);
+  assert.equal(body.gamesPlayed, 6);
+  assert.ok(JSON.stringify(body).length < 5000, `stats payload is ${JSON.stringify(body).length} bytes`);
+  const offense = Object.fromEntries(body.offense.map(tile => [tile.key, tile]));
+  const defense = Object.fromEntries(body.defense.map(tile => [tile.key, tile]));
+  assert.equal(offense.pointsPerGame.display, '25.7');
+  assert.equal(offense.pointsPerGame.rank, undefined);
+  assert.equal(offense.yardsPerGame.display, '359.5');
+  assert.equal(offense.passingYardsPerGame.display, '246.7');
+  assert.equal(offense.rushingYardsPerGame.display, '112.8');
+  assert.equal(offense.passingTouchdowns.display, '14');
+  assert.equal(offense.rushingTouchdowns.display, '4');
+  assert.equal(offense.completionPct.display, '65.2');
+  assert.equal(offense.yardsPerRush.display, '4.1');
+  assert.equal(offense.thirdDownPct.display, '47.95');
+  assert.equal(offense.firstDowns.display, '128');
+  assert.equal(offense.giveaways.display, '4');
+  assert.equal(offense.sacksTaken.display, '10');
+  assert.equal(defense.yardsAllowed.display, '355.2');
+  assert.equal(defense.yardsAllowed.rank, 18);
+  assert.equal(defense.pointsAllowed.display, '17.3');
+  assert.equal(defense.pointsAllowed.rank, 3);
+  assert.equal(defense.sacks.display, '11');
+  assert.equal(defense.sacks.rank, undefined);
+  assert.equal(defense.interceptions.display, '7');
+  assert.equal(defense.forcedFumbles.display, '4');
+  assert.equal(defense.fumbleRecoveries.display, '2');
+  assert.equal(defense.takeaways.display, '9');
+  assert.equal(defense.tackles.display, '383');
+  assert.equal(defense.tacklesForLoss.display, '24');
+
+  const again = await handler(new Request('https://nfl.example/stats?team=30'));
+  assert.equal(again.status, 200);
+  assert.equal(calls.length, 2, 'each /stats call is one fetch; the Cache API is not used');
+  assert.equal(cacheHits, 0);
+});
+
+test('stats route computes per-game rates only from totals and games played', () => {
+  assert.equal(statCategories(statsFixture.results.opponent).length, 11);
+  assert.equal(statCategories(statsFixture.results.stats).length, 11);
+  const normalized = normalizeTeamStats({
+    team: { id: '4', displayName: 'Cincinnati Bengals', abbreviation: 'CIN' },
+    season: { year: 2025 },
+    results: {
+      stats: {
+        categories: [
+          { name: 'general', stats: [{ name: 'gamesPlayed', displayValue: '4', value: 4 }] },
+          { name: 'scoring', stats: [{ name: 'totalPoints', displayValue: '80', value: 80 }] },
+          { name: 'rushing', stats: [{ name: 'totalYards', displayValue: '1000', value: 1000 }, { name: 'rushingYards', displayValue: '400', value: 400 }] },
+          { name: 'passing', stats: [{ name: 'passingYards', displayValue: '600', value: 600, rank: 4 }, { name: 'sacks', displayValue: '8', value: 8 }] },
+          { name: 'defensive', stats: [{ name: 'sacks', displayValue: '9', value: 9 }] }
+        ]
+      },
+      opponent: {
+        categories: [
+          { name: 'scoring', stats: [{ name: 'totalPoints', displayValue: '60', value: 60, rank: 2 }] }
+        ]
+      }
+    }
+  }, '4');
+  const offense = Object.fromEntries(normalized.offense.map(tile => [tile.key, tile]));
+  const defense = Object.fromEntries(normalized.defense.map(tile => [tile.key, tile]));
+  assert.equal(normalized.gamesPlayed, 4);
+  assert.equal(offense.pointsPerGame.display, '20');
+  assert.equal(offense.pointsPerGame.computed, true);
+  assert.equal(offense.pointsPerGame.rank, undefined);
+  assert.equal(offense.yardsPerGame.display, '250');
+  assert.equal(offense.yardsPerGame.computed, true);
+  assert.equal(offense.passingYardsPerGame.display, '150');
+  assert.equal(offense.passingYardsPerGame.computed, true);
+  assert.equal(offense.passingYardsPerGame.rank, undefined);
+  assert.equal(offense.sacksTaken.display, '8');
+  assert.equal(offense.thirdDownPct.display, null);
+  assert.equal(defense.pointsAllowed.display, '15');
+  assert.equal(defense.pointsAllowed.computed, true);
+  assert.equal(defense.pointsAllowed.rank, undefined);
+  assert.equal(defense.yardsAllowed.display, null);
+  assert.equal(defense.sacks.display, '9');
+  assert.equal(defense.tacklesForLoss.display, null);
+
+  const totalsOnly = normalizeTeamStats({
+    results: {
+      stats: { categories: [{ name: 'scoring', stats: [{ name: 'totalPoints', displayValue: '99', value: 99, rank: 8 }] }] }
+    }
+  }, '8');
+  const points = totalsOnly.offense.find(tile => tile.key === 'pointsPerGame');
+  assert.equal(points.display, '99');
+  assert.equal(points.label, 'Points');
+  assert.equal(points.rank, 8);
+  assert.equal(points.computed, undefined);
+  assert.equal(totalsOnly.gamesPlayed, null);
+});
+
+test('stats failures are not turned into an empty success', async () => {
+  let mode = 'missing';
+  const handler = createHandler({
+    fetch: async () => {
+      if (mode === 'throw') throw new Error('network down');
+      if (mode === 'missing') return new Response('missing', { status: 404 });
+      if (mode === 'html') return new Response('<html>nope</html>', { status: 200, headers: { 'Content-Type': 'text/html' } });
+      return new Response('upstream', { status: 500 });
+    },
+    cache: memoryCache()
+  });
+  const missing = await handler(new Request('https://nfl.example/stats?team=30'));
+  assert.equal(missing.status, 404);
+  assert.equal((await missing.json()).unavailable, true);
+  mode = 'html';
+  assert.equal((await handler(new Request('https://nfl.example/stats?team=30'))).status, 502);
+  mode = 'throw';
+  assert.equal((await handler(new Request('https://nfl.example/stats?team=30'))).status, 502);
+  mode = 'down';
+  assert.equal((await handler(new Request('https://nfl.example/stats?team=30'))).status, 502);
+});
+
 test('worker source stays on the Cache API without a KV binding', () => {
   const source = readFileSync(join(root, '../worker/worker.js'), 'utf8');
   const toml = readFileSync(join(root, '../worker/wrangler.toml'), 'utf8');
@@ -423,6 +586,11 @@ test('worker source stays on the Cache API without a KV binding', () => {
   assert.match(source, /\(\.\.\.args\) => fetch\(\.\.\.args\)/);
   assert.match(source, /apis\/common\/v3\/sports\/football\/nfl\/athletes/);
   assert.doesNotMatch(source, /sports\.core\.api\.espn\.com/);
+  const statsFn = source.slice(source.indexOf('async function handleStats'), source.indexOf('async function handleDraft'));
+  assert.match(statsFn, /teams\/\$\{teamId\}\/statistics/);
+  assert.match(statsFn, /cacheTtl:\s*STATS_CACHE_SECONDS/);
+  assert.match(statsFn, /cacheEverything:\s*true/);
+  assert.doesNotMatch(statsFn, /cacheGet|cachePut|caches/);
   assert.doesNotMatch(source, /kv_namespaces|KVNamespace/);
   assert.doesNotMatch(toml, /kv_namespaces/);
   assert.match(toml, /name = "nfl-live-data"/);

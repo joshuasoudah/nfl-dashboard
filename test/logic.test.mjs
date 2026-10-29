@@ -178,16 +178,16 @@ test('saved preferences and draft cache reject corrupt or hostile values', () =>
     autoRefresh: 'false',
     favoriteId: '<img src=x>',
     expanded: ['30', '<b>', '30', 2, null, '9999'],
-    tabs: { '30': 'roster', '<bad>': 'roster', '2': 'nope', '15': 'games' },
+    tabs: { '30': 'roster', '<bad>': 'roster', '2': 'nope', '15': 'games', '34': 'stats' },
     otherOpen: { '30': true, '2': 'yes', '<x>': true }
   });
   assert.equal(clean.theme, 'system');
   assert.equal(clean.autoRefresh, true);
-  assert.equal(clean.favoriteId, null);
+  assert.equal('favoriteId' in clean, false);
   assert.deepEqual(clean.expanded, ['30', '2']);
-  assert.deepEqual(clean.tabs, { '30': 'roster', '15': 'games' });
+  assert.deepEqual(clean.tabs, { '30': 'roster', '15': 'games', '34': 'stats' });
   assert.deepEqual(clean.otherOpen, { '30': true });
-  assert.equal(sanitizePrefs({ theme: 'light', favoriteId: 30, autoRefresh: false }).favoriteId, '30');
+  assert.equal('favoriteId' in sanitizePrefs({ theme: 'light', favoriteId: 30, autoRefresh: false }), false);
 
   const now = Date.now();
   const drafts = sanitizeDraftCache({

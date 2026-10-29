@@ -1,6 +1,8 @@
 // NFL live-data worker.
 // Existing /teams, /scoreboard, and /standings proxies are unchanged.
-// /roster and /draft are added for the standings Roster tab.
+// /roster and /draft serve the Roster tab.
+// /stats serves the Stats tab: one ESPN statistics fetch, edge-cached with
+// cf.cacheTtl (not the Cache API), normalized to the tiles the page shows.
 //
 // Draft info is not on the roster or depth-chart payloads. Each athlete is
 // loaded from the core API, at most 40 per /draft call, with a small parallel
@@ -17,6 +19,7 @@ export const MAX_DRAFT_IDS = 40;
 export const DRAFT_CONCURRENCY = 6;
 export const ROSTER_CACHE_SECONDS = 60 * 60 * 2;
 export const DRAFT_CACHE_SECONDS = 60 * 60 * 24 * 30;
+export const STATS_CACHE_SECONDS = 1800;
 
 const SECTION_ORDER = ["Offense", "Defense", "Special Teams"];
 
@@ -192,6 +195,190 @@ export function joinRoster(roster, depth) {
   return { sections, other };
 }
 
+export function statCategories(node) {
+  if (!node || typeof node !== "object") return [];
+  if (Array.isArray(node)) {
+    const direct = node.filter(item => item && typeof item === "object" && Array.isArray(item.stats));
+    if (direct.length) return direct;
+    return node.flatMap(item => (item && Array.isArray(item.categories) ? item.categories : []));
+  }
+  if (Array.isArray(node.categories)) return node.categories;
+  if (Array.isArray(node.stats)) return [node];
+  return [];
+}
+
+function indexStats(categories) {
+  const byQualified = new Map();
+  for (const category of categories) {
+    if (!category || typeof category !== "object") continue;
+    const cat = String(category.name || "");
+    const stats = Array.isArray(category.stats) ? category.stats : [];
+    for (const stat of stats) {
+      if (!stat || typeof stat.name !== "string" || !stat.name) continue;
+      const key = `${cat}.${stat.name}`;
+      if (!byQualified.has(key)) byQualified.set(key, stat);
+    }
+  }
+  return byQualified;
+}
+
+function lookupStat(index, keys) {
+  for (const key of keys) {
+    const stat = index.get(key);
+    if (stat) return stat;
+  }
+  return null;
+}
+
+function numericStat(stat) {
+  if (!stat || stat.value == null || stat.value === "") return null;
+  const number = Number(stat.value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function rankOf(stat) {
+  if (!stat || stat.rank == null || stat.rank === "") return null;
+  const rank = Number(stat.rank);
+  return Number.isInteger(rank) && rank > 0 ? rank : null;
+}
+
+function displayOf(stat) {
+  if (!stat) return null;
+  if (stat.displayValue != null && String(stat.displayValue).trim() !== "") return String(stat.displayValue).trim();
+  const number = numericStat(stat);
+  return number == null ? null : String(number);
+}
+
+function gamesPlayedFrom(index) {
+  const stat = lookupStat(index, ["general.gamesPlayed", "passing.teamGamesPlayed", "rushing.teamGamesPlayed", "defensive.teamGamesPlayed"]);
+  const value = numericStat(stat);
+  if (value == null || value <= 0) return null;
+  return value;
+}
+
+function formatPerGame(total, games) {
+  const number = total / games;
+  if (!Number.isFinite(number)) return null;
+  const rounded = Math.round(number * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+}
+
+function statTile(key, label, extra) {
+  const tile = { key, label, display: extra && extra.display != null ? String(extra.display) : null };
+  if (extra && extra.computed) tile.computed = true;
+  if (extra && extra.rank != null) tile.rank = extra.rank;
+  return tile;
+}
+
+function directTile(key, label, stat) {
+  return statTile(key, label, { display: displayOf(stat), rank: rankOf(stat) });
+}
+
+/* Prefer ESPN's own per-game figure. Otherwise divide a provided total by
+   games played and mark the tile computed. A total with no games stays a total
+   and keeps that stat's rank. A computed per-game figure does not inherit the
+   total's rank, because that rank is not for the rate. */
+function perGameTile(key, perLabel, totalLabel, perGameStat, totalStat, games) {
+  const perDisplay = displayOf(perGameStat);
+  if (perDisplay != null) return statTile(key, perLabel, { display: perDisplay, rank: rankOf(perGameStat) });
+  const total = numericStat(totalStat);
+  if (total != null && games) {
+    const display = formatPerGame(total, games);
+    if (display != null) return statTile(key, perLabel, { display, computed: true });
+  }
+  const totalDisplay = displayOf(totalStat);
+  if (totalDisplay != null) return statTile(key, totalLabel, { display: totalDisplay, rank: rankOf(totalStat) });
+  return statTile(key, perLabel, { display: null });
+}
+
+export function normalizeTeamStats(payload, teamId) {
+  const body = payload && typeof payload === "object" && !Array.isArray(payload) ? payload : {};
+  const results = body.results && typeof body.results === "object" && !Array.isArray(body.results) ? body.results : {};
+  const teamIndex = indexStats(statCategories(results.stats));
+  const oppIndex = indexStats(statCategories(results.opponent));
+  const games = gamesPlayedFrom(teamIndex) || gamesPlayedFrom(oppIndex);
+  const team = body.team && typeof body.team === "object" ? body.team : {};
+  const seasonYear = Number(body.season && body.season.year);
+  const offense = [
+    perGameTile(
+      "pointsPerGame",
+      "Points per game",
+      "Points",
+      lookupStat(teamIndex, ["scoring.totalPointsPerGame", "passing.totalPointsPerGame"]),
+      lookupStat(teamIndex, ["scoring.totalPoints", "passing.totalPoints"]),
+      games
+    ),
+    perGameTile(
+      "yardsPerGame",
+      "Yards per game",
+      "Total yards",
+      lookupStat(teamIndex, ["passing.yardsPerGame"]),
+      lookupStat(teamIndex, ["rushing.totalYards"]),
+      games
+    ),
+    perGameTile(
+      "passingYardsPerGame",
+      "Passing yards per game",
+      "Passing yards",
+      lookupStat(teamIndex, ["passing.passingYardsPerGame", "passing.netPassingYardsPerGame"]),
+      lookupStat(teamIndex, ["passing.passingYards", "passing.netPassingYards"]),
+      games
+    ),
+    perGameTile(
+      "rushingYardsPerGame",
+      "Rushing yards per game",
+      "Rushing yards",
+      lookupStat(teamIndex, ["rushing.rushingYardsPerGame"]),
+      lookupStat(teamIndex, ["rushing.rushingYards"]),
+      games
+    ),
+    directTile("passingTouchdowns", "Passing TDs", lookupStat(teamIndex, ["passing.passingTouchdowns"])),
+    directTile("rushingTouchdowns", "Rushing TDs", lookupStat(teamIndex, ["rushing.rushingTouchdowns"])),
+    directTile("completionPct", "Completion %", lookupStat(teamIndex, ["passing.completionPct"])),
+    directTile("yardsPerRush", "Yards per rush", lookupStat(teamIndex, ["rushing.yardsPerRushAttempt"])),
+    directTile("thirdDownPct", "Third down %", lookupStat(teamIndex, ["miscellaneous.thirdDownConvPct"])),
+    directTile("firstDowns", "First downs", lookupStat(teamIndex, ["miscellaneous.firstDowns"])),
+    directTile("giveaways", "Giveaways", lookupStat(teamIndex, ["miscellaneous.totalGiveaways"])),
+    directTile("sacksTaken", "Sacks taken", lookupStat(teamIndex, ["passing.sacks"]))
+  ];
+  const defense = [
+    perGameTile(
+      "yardsAllowed",
+      "Yards allowed per game",
+      "Yards allowed",
+      lookupStat(oppIndex, ["passing.yardsPerGame"]),
+      lookupStat(oppIndex, ["rushing.totalYards"]),
+      games
+    ),
+    perGameTile(
+      "pointsAllowed",
+      "Points allowed per game",
+      "Points allowed",
+      lookupStat(oppIndex, ["scoring.totalPointsPerGame", "passing.totalPointsPerGame"]),
+      lookupStat(oppIndex, ["scoring.totalPoints", "passing.totalPoints"]),
+      games
+    ),
+    directTile("sacks", "Sacks", lookupStat(teamIndex, ["defensive.sacks"])),
+    directTile("interceptions", "Interceptions", lookupStat(teamIndex, ["defensiveInterceptions.interceptions"])),
+    directTile("forcedFumbles", "Forced fumbles", lookupStat(teamIndex, ["general.fumblesForced"])),
+    directTile("fumbleRecoveries", "Fumble recoveries", lookupStat(teamIndex, ["general.fumblesRecovered"])),
+    directTile("takeaways", "Takeaways", lookupStat(teamIndex, ["miscellaneous.totalTakeaways"])),
+    directTile("tackles", "Tackles", lookupStat(teamIndex, ["defensive.totalTackles"])),
+    directTile("tacklesForLoss", "Tackles for loss", lookupStat(teamIndex, ["defensive.tacklesForLoss"]))
+  ];
+  return {
+    team: {
+      id: String(teamId || team.id || ""),
+      name: team.displayName || team.name || null,
+      abbreviation: team.abbreviation || null
+    },
+    season: Number.isInteger(seasonYear) ? seasonYear : null,
+    gamesPlayed: games,
+    offense,
+    defense
+  };
+}
+
 export async function mapPool(items, limit, fn) {
   const results = new Array(items.length);
   let cursor = 0;
@@ -334,6 +521,38 @@ async function loadDraft(id, deps) {
   return { id, ok: true, draft: draftFromAthlete(athlete) };
 }
 
+async function handleStats(url, deps, corsHeaders) {
+  const teamId = parseTeamId(url.searchParams.get("team"));
+  if (!teamId) return jsonResponse(corsHeaders, { error: "Invalid team id" }, 400);
+
+  const target = `${ESPN_SITE}/apis/site/v2/sports/football/nfl/teams/${teamId}/statistics`;
+  let response;
+  try {
+    response = await deps.fetch(target, {
+      headers: { "Accept": "application/json" },
+      cf: { cacheTtl: STATS_CACHE_SECONDS, cacheEverything: true }
+    });
+  } catch (error) {
+    console.error(JSON.stringify({ msg: "stats fetch failed", teamId, error: String(error && error.message || error) }));
+    return jsonResponse(corsHeaders, { error: "Unable to retrieve ESPN data" }, 502);
+  }
+
+  if (response.status === 404) {
+    return jsonResponse(corsHeaders, { error: "Stats unavailable", unavailable: true }, 404);
+  }
+  if (!response.ok) {
+    console.error(JSON.stringify({ msg: "stats fetch failed", teamId, status: response.status }));
+    return jsonResponse(corsHeaders, { error: "Unable to retrieve ESPN data" }, 502);
+  }
+
+  const body = await readJson(response);
+  if (!body || typeof body !== "object" || Array.isArray(body) || !body.results || typeof body.results !== "object" || Array.isArray(body.results)) {
+    return jsonResponse(corsHeaders, { error: "Unable to retrieve ESPN data" }, 502);
+  }
+
+  return jsonResponse(corsHeaders, normalizeTeamStats(body, teamId), 200, STATS_CACHE_SECONDS);
+}
+
 async function handleDraft(url, deps, corsHeaders) {
   const parsed = parseDraftIds(url.searchParams.get("ids"));
   if (parsed.error) return jsonResponse(corsHeaders, { error: parsed.error }, 400);
@@ -399,11 +618,12 @@ export function createHandler(deps = {}) {
 
     if (url.pathname === "/roster") return handleRoster(url, runtime, corsHeaders);
     if (url.pathname === "/draft") return handleDraft(url, runtime, corsHeaders);
+    if (url.pathname === "/stats") return handleStats(url, runtime, corsHeaders);
 
     if (!PROXIED_ROUTES[url.pathname]) {
       return Response.json({
         message: "NFL Data API is running",
-        endpoints: ["/teams", "/scoreboard", "/standings", "/roster", "/draft"]
+        endpoints: ["/teams", "/scoreboard", "/standings", "/roster", "/draft", "/stats"]
       }, { headers: corsHeaders });
     }
 
