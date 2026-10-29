@@ -43,6 +43,19 @@ test('page keeps the manifest, favicon, and saved preferences', () => {
   assert.match(app, /prefers-reduced-motion/);
 });
 
+test('search and favorites are gone, and the page does not claim NFL affiliation', () => {
+  assert.equal(html.includes('id="search"'), false);
+  assert.equal(html.includes('My team'), false);
+  assert.equal(html.includes('>STANDINGS<'), true);
+  assert.match(html, /not affiliated with the NFL/);
+  assert.match(html, /unofficial and comes from/);
+  assert.equal(app.includes('favoriteId'), false);
+  assert.equal(app.includes("querySelector('#search')"), false);
+  assert.equal(app.includes('button.fav'), false);
+  assert.match(app, /Stats are not available yet/);
+  assert.equal(logic.includes('favoriteId'), false);
+});
+
 test('palette covers all 32 team ids', () => {
   const ids = ['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22','23','24','25','26','27','28','29','30','33','34'];
   for (const id of ids) assert.match(logic, new RegExp(`['"]${id}['"]:\\s*\\{`));

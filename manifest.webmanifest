@@ -1,13 +1,13 @@
 {
   "id": "./",
-  "name": "NFL Standings",
-  "short_name": "NFL Standings",
-  "description": "Live NFL regular-season standings, scores, and depth charts.",
+  "name": "Standings",
+  "short_name": "Standings",
+  "description": "Unofficial regular-season standings, scores, and depth charts. Not affiliated with the NFL.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#07101c",
-  "theme_color": "#101827",
+  "background_color": "#010f22",
+  "theme_color": "#013369",
   "icons": [
     {
       "src": "icon.svg",

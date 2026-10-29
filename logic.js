@@ -121,11 +121,10 @@ export function normalizeDraft(draft) {
 }
 
 export function sanitizePrefs(raw) {
-  const prefs = { theme: 'system', autoRefresh: true, favoriteId: null, expanded: [], tabs: {}, otherOpen: {} };
+  const prefs = { theme: 'system', autoRefresh: true, expanded: [], tabs: {}, otherOpen: {} };
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return prefs;
   if (raw.theme === 'light' || raw.theme === 'dark' || raw.theme === 'system') prefs.theme = raw.theme;
   if (typeof raw.autoRefresh === 'boolean') prefs.autoRefresh = raw.autoRefresh;
-  prefs.favoriteId = cleanTeamId(raw.favoriteId);
   if (Array.isArray(raw.expanded)) {
     for (const value of raw.expanded) {
       const id = cleanTeamId(value);
@@ -137,7 +136,7 @@ export function sanitizePrefs(raw) {
   if (raw.tabs && typeof raw.tabs === 'object' && !Array.isArray(raw.tabs)) {
     for (const [key, value] of Object.entries(raw.tabs)) {
       const id = cleanTeamId(key);
-      if (!id || (value !== 'games' && value !== 'roster')) continue;
+      if (!id || (value !== 'games' && value !== 'roster' && value !== 'stats')) continue;
       prefs.tabs[id] = value;
       if (Object.keys(prefs.tabs).length >= 32) break;
     }

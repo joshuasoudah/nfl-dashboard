@@ -1,64 +1,70 @@
-/* Stadium-night standings. Colors live on <html data-theme> so the
-   head script can set them before first paint. No external images or fonts. */
+/* Broadcast standings. Navy and red live on <html data-theme> so the
+   head script can set them before first paint. No external images or fonts.
+   Condensed headings use a system font stack only. */
 :root {
   color-scheme: dark;
+  --nfl-navy: #013369;
+  --nfl-red: #D50A0A;
   --pad-l: max(16px, env(safe-area-inset-left));
   --pad-r: max(16px, env(safe-area-inset-right));
-  --bg: #07101c;
-  --bg-raise: #101a2b;
-  --sticky: rgba(8, 16, 30, .94);
-  --card: rgba(16, 26, 43, .9);
-  --card-solid: #142033;
-  --text: #f4f7fb;
-  --muted: #c5d4e6;
-  --line: rgba(214, 226, 242, .14);
-  --input: #0d1728;
-  --accent: #9ec0ff;
+  --condensed: "Arial Narrow", "Helvetica Condensed", "Roboto Condensed", "Franklin Gothic Medium", "Nimbus Sans Narrow", "Segoe UI", sans-serif;
+  --bg: #010f22;
+  --bg-raise: #011833;
+  --sticky: rgba(1, 15, 34, .96);
+  --card: #01264a;
+  --card-solid: #013369;
+  --text: #f7f9fc;
+  --muted: #d5e2f2;
+  --line: rgba(213, 226, 242, .16);
+  --input: #011428;
+  --accent: #d5e2f2;
   --focus: #9ec0ff;
-  --button: #2563eb;
+  --button: #D50A0A;
   --button-text: #fff;
   --good: #8ee8b4;
   --bad: #ffb4b4;
   --tie: #ffe08a;
   --gold: #f6d36b;
+  --live: #D50A0A;
+  --live-text: #ffb4b4;
   --danger-bg: #3a1c22;
   --danger-text: #ffd7dc;
   --danger-border: #8d4450;
-  --glow-a: rgba(70, 120, 220, .22);
-  --glow-b: rgba(32, 160, 120, .14);
-  --yard: rgba(255, 255, 255, .035);
-  --shadow: 0 10px 30px rgba(0, 0, 0, .28);
+  --field-line: rgba(255, 255, 255, .045);
+  --shadow: 0 10px 28px rgba(0, 0, 0, .32);
   --skeleton: rgba(255, 255, 255, .06);
-  --skeleton-shine: rgba(255, 255, 255, .14);
+  --skeleton-shine: rgba(255, 255, 255, .16);
+  --tile: #011a36;
 }
 html[data-theme="light"] {
   color-scheme: light;
-  --bg: #e7eef6;
-  --bg-raise: #f8fbfe;
-  --sticky: rgba(238, 244, 250, .94);
-  --card: rgba(255, 255, 255, .92);
+  --bg: #f4f6f8;
+  --bg-raise: #ffffff;
+  --sticky: rgba(244, 246, 248, .96);
+  --card: #ffffff;
   --card-solid: #ffffff;
-  --text: #142033;
-  --muted: #3d516b;
-  --line: rgba(16, 36, 68, .14);
+  --text: #0c2340;
+  --muted: #3a4d66;
+  --line: rgba(1, 51, 105, .16);
   --input: #ffffff;
-  --accent: #1d4e89;
-  --focus: #1d4e89;
-  --button: #1d4e89;
+  --accent: #013369;
+  --focus: #013369;
+  --button: #D50A0A;
   --button-text: #fff;
   --good: #0b6b3c;
-  --bad: #a32018;
+  --bad: #9d0707;
   --tie: #8a5a00;
   --gold: #6e4e00;
+  --live: #D50A0A;
+  --live-text: #9d0707;
   --danger-bg: #fff1f1;
   --danger-text: #7a1d1d;
   --danger-border: #e4aaaa;
-  --glow-a: rgba(40, 90, 180, .1);
-  --glow-b: rgba(20, 140, 100, .08);
-  --yard: rgba(20, 40, 80, .045);
-  --shadow: 0 10px 28px rgba(20, 40, 70, .08);
-  --skeleton: rgba(20, 40, 80, .06);
-  --skeleton-shine: rgba(255, 255, 255, .7);
+  --field-line: rgba(1, 51, 105, .08);
+  --shadow: 0 8px 24px rgba(1, 51, 105, .08);
+  --skeleton: rgba(1, 51, 105, .06);
+  --skeleton-shine: rgba(255, 255, 255, .8);
+  --tile: #f7f9fc;
 }
 
 * { box-sizing: border-box; }
@@ -69,24 +75,18 @@ body {
   margin: 0;
   color: var(--text);
   font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
-  background:
-    radial-gradient(980px 460px at 0% -8%, var(--glow-a), transparent 56%),
-    radial-gradient(760px 420px at 100% 0%, var(--glow-b), transparent 52%),
-    repeating-linear-gradient(90deg, transparent 0 48px, var(--yard) 48px 49px),
-    var(--bg);
+  background-color: var(--bg);
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0 52px,
+    var(--field-line) 52px 53px
+  );
   line-height: 1.4;
 }
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  opacity: .35;
-  background-image: radial-gradient(rgba(255, 255, 255, .16) .6px, transparent .7px);
-  background-size: 4px 4px;
-  mix-blend-mode: overlay;
+h1, h2, h3, .head, .tab, .section-title, .stat-label, .live-state, .rank-badge {
+  font-family: var(--condensed);
+  font-stretch: condensed;
 }
-html[data-theme="light"] body::before { opacity: .25; mix-blend-mode: multiply; }
 
 :focus { outline: none; }
 :focus-visible {
@@ -126,64 +126,96 @@ main {
   background: var(--sticky);
   border-bottom: 1px solid var(--line);
 }
-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.brand { display: flex; gap: 10px; align-items: flex-start; min-width: 0; }
-h1 { font-size: clamp(1.35rem, 2vw, 1.7rem); line-height: 1.1; margin: 0; letter-spacing: -.02em; }
-#season { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
-.live-state {
+.scoreboard {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 3px 0 0;
-  min-width: 52px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin: -8px calc(var(--pad-r) * -1) 0 calc(var(--pad-l) * -1);
+  padding: 12px var(--pad-r) 12px var(--pad-l);
+  background: var(--nfl-navy);
+  color: #fff;
+  border-bottom: 4px solid var(--nfl-red);
+}
+.brand { display: flex; gap: 10px; align-items: flex-start; min-width: 0; }
+h1 {
+  margin: 0;
+  color: #fff;
+  font-size: clamp(1.6rem, 4vw, 2.15rem);
+  font-weight: 800;
+  line-height: .95;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+#season {
+  margin: 6px 0 0;
+  color: #d6e4f5;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: .08em;
   text-transform: uppercase;
-  color: var(--good);
+}
+.live-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 0;
+  min-height: 22px;
+  min-width: 52px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: #fff;
 }
 .live-dot {
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: var(--muted);
+  background: rgba(255, 255, 255, .45);
   flex: none;
 }
-.live-dot.on { background: var(--good); animation: pulse 2.2s ease-out infinite; }
+.live-dot.on { background: var(--nfl-red); box-shadow: 0 0 0 3px rgba(213, 10, 10, .28); animation: pulse 2.2s ease-out infinite; }
 .header-actions { display: flex; gap: 8px; flex: none; }
 .header-actions button, .toolbar button, .retry, .settings-close {
   min-height: 44px;
-  border-radius: 12px;
+  border-radius: 8px;
   border: 1px solid var(--line);
   background: var(--card-solid);
   padding: 8px 12px;
 }
-#refresh { background: var(--button); color: var(--button-text); border-color: transparent; font-weight: 700; }
-#refresh[aria-busy="true"] { opacity: .7; }
+.scoreboard .header-actions button {
+  background: transparent;
+  color: #fff;
+  border-color: rgba(255, 255, 255, .45);
+  font-weight: 700;
+}
+.scoreboard #refresh {
+  background: var(--nfl-red);
+  color: #fff;
+  border-color: transparent;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+#refresh[aria-busy="true"] { opacity: .72; }
 
 .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; align-items: center; }
-.search { position: relative; flex: 1 1 220px; min-width: min(100%, 180px); }
 .toolbar select { flex: 1 1 148px; width: auto; min-width: min(100%, 140px); }
-.toolbar > button { flex: 0 1 auto; }
-.search input, .toolbar select {
+.toolbar > button { flex: 1 1 120px; }
+.toolbar select {
   width: 100%;
   min-height: 44px;
-  border-radius: 12px;
+  border-radius: 8px;
   border: 1px solid var(--line);
   background: var(--input);
   padding: 8px 12px;
 }
-.search input::placeholder { color: var(--muted); opacity: 1; }
-.toolbar button { flex: 1 1 120px; font-weight: 700; }
+.toolbar button { font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
 #live-only[aria-pressed="true"] {
-  background: #123c2c;
-  color: #d9ffe9;
-  border-color: #1f7a52;
-}
-html[data-theme="light"] #live-only[aria-pressed="true"] {
-  background: #e5f8ee;
-  color: #085c34;
-  border-color: #8dcfb0;
+  background: var(--nfl-red);
+  color: #fff;
+  border-color: transparent;
 }
 #status, #filter-status, .as-of { color: var(--muted); font-size: 13px; }
 .status-line {
@@ -214,19 +246,19 @@ html[data-theme="light"] #live-only[aria-pressed="true"] {
   max-width: 100%;
   padding: 6px 10px;
   border-radius: 999px;
-  border: 1px solid #1f7a52;
-  background: #123c2c;
-  color: #d9ffe9;
+  border: 1px solid transparent;
+  background: var(--nfl-red);
+  color: #fff;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
-html[data-theme="light"] .live-chip { background: #e5f8ee; color: #085c34; }
+html[data-theme="light"] .live-chip { background: var(--nfl-red); color: #fff; }
 .head {
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr) 74px 16px;
   gap: 8px;
   align-items: center;
-  padding: 6px 53px 6px 13px;
+  padding: 6px 12px;
   color: var(--muted);
   font-size: 11px;
   font-weight: 700;
@@ -248,8 +280,8 @@ html[data-theme="light"] .live-chip { background: #e5f8ee; color: #085c34; }
 }
 .entry.live-team {
   box-shadow:
-    inset 3px 0 0 var(--team, var(--good)),
-    0 0 0 1px color-mix(in srgb, var(--good) 70%, transparent),
+    inset 3px 0 0 var(--team, var(--nfl-red)),
+    0 0 0 1px color-mix(in srgb, var(--nfl-red) 70%, transparent),
     var(--shadow);
 }
 .team {
@@ -259,7 +291,7 @@ html[data-theme="light"] .live-chip { background: #e5f8ee; color: #085c34; }
   grid-template-columns: 28px minmax(0, 1fr) 74px 16px;
   gap: 8px;
   align-items: center;
-  padding: 8px 52px 8px 12px;
+  padding: 8px 12px;
   background: transparent;
   border: 0;
   text-align: left;
@@ -273,19 +305,29 @@ html[data-theme="light"] .live-chip { background: #e5f8ee; color: #085c34; }
 .id-text { min-width: 0; display: block; }
 .name-line { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 0; }
 .name { font-size: 15px; font-weight: 700; }
-.sub, .live-indicator { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
-.live-indicator { color: var(--good); font-weight: 700; }
-.live-pill, .mine {
-  font-size: 10px;
+.sub, .live-indicator { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.sub { display: block; }
+.live-indicator {
+  display: inline-block;
+  margin-top: 4px;
+  color: #fff;
+  background: var(--nfl-red);
   font-weight: 800;
   letter-spacing: .04em;
+  border-radius: 999px;
+  padding: 3px 8px;
+}
+.live-pill {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .06em;
   text-transform: uppercase;
   border-radius: 999px;
   padding: 3px 6px;
   line-height: 1.2;
+  color: #fff;
+  background: var(--nfl-red);
 }
-.live-pill { color: #062416; background: #8ee8b4; }
-.mine { color: #2a2108; background: #f6d36b; }
 .record { text-align: right; font-weight: 800; white-space: nowrap; }
 .arrow {
   width: 16px;
@@ -297,47 +339,55 @@ html[data-theme="light"] .live-chip { background: #e5f8ee; color: #085c34; }
   transition: transform .2s ease;
 }
 .arrow.open { transform: rotate(180deg); }
-.fav {
-  position: absolute;
-  top: 10px;
-  right: 6px;
-  z-index: 1;
-  width: 44px;
-  height: 44px;
-  border: 0;
-  border-radius: 12px;
-  background: transparent;
-  color: var(--muted);
-  font-size: 22px;
-  line-height: 1;
-}
-.fav.on { color: var(--gold); }
-
 .panel { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .22s ease; }
 .panel.open { grid-template-rows: 1fr; }
 .panel-clip { min-height: 0; overflow: hidden; }
 .panel:not(.open) .panel-clip { visibility: hidden; }
-.tabs { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 14px 0; }
-.tab {
-  min-height: 44px;
-  padding: 8px 14px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: transparent;
-  font-weight: 700;
+.tabs {
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  flex-wrap: nowrap;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  padding: 12px 14px 0;
+  box-sizing: border-box;
 }
-.tab[aria-selected="true"] { background: var(--button); border-color: transparent; color: var(--button-text); }
-.games-mount, .roster-slot { padding: 4px 14px 14px; }
+.tab {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 180px;
+  min-height: 48px;
+  padding: 8px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--card-solid);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  text-align: center;
+  white-space: nowrap;
+}
+.tab[aria-selected="true"] { background: var(--nfl-red); border-color: transparent; color: #fff; }
+html[data-theme="light"] .tab:not([aria-selected="true"]) {
+  background: #fff;
+  color: #013369;
+  border-color: #013369;
+}
+.games-mount, .roster-slot, .stats-slot { padding: 4px 14px 14px; }
 .section-title {
   margin: 14px 0 4px;
   font-size: 11px;
   font-weight: 800;
-  letter-spacing: .07em;
+  letter-spacing: .08em;
   color: var(--muted);
+  text-transform: uppercase;
 }
 .section-title.playoff-title { color: var(--gold); }
 .section-title.upcoming-title { color: var(--accent); }
-.section-title.live-title { color: var(--good); }
+.section-title.live-title { color: var(--live-text); }
 .game {
   display: flex;
   justify-content: space-between;
@@ -351,12 +401,12 @@ html[data-theme="light"] .live-chip { background: #e5f8ee; color: #085c34; }
 .game.upcoming, .game.playoff, .game.is-live { border: 1px solid var(--line); border-radius: 12px; margin: 6px 0; padding: 10px; }
 .game.upcoming { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .game.playoff { background: color-mix(in srgb, #e9b96e 16%, transparent); }
-.game.is-live { background: color-mix(in srgb, var(--good) 14%, transparent); outline: 1px solid color-mix(in srgb, var(--good) 55%, transparent); }
+.game.is-live { background: color-mix(in srgb, var(--nfl-red) 12%, transparent); outline: 1px solid color-mix(in srgb, var(--nfl-red) 55%, transparent); }
 .game-info { min-width: 0; }
 .game-meta, .roster-source, .player-meta, .empty { color: var(--muted); font-size: 12px; }
 .game-score { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; text-align: right; flex: none; }
 .badge { font-size: 10px; font-weight: 800; letter-spacing: .04em; color: var(--accent); }
-.game.is-live .badge, .live-title { color: var(--good); }
+.game.is-live .badge { color: #fff; background: var(--nfl-red); border-radius: 999px; padding: 2px 6px; }
 .game.playoff .badge { color: var(--gold); }
 .W { color: var(--good); }
 .L { color: var(--bad); }
@@ -413,6 +463,62 @@ html[data-theme="light"] .live-chip { background: #e5f8ee; color: #085c34; }
 .other-roster { margin-top: 8px; border-top: 1px solid var(--line); }
 .other-roster summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-weight: 700; }
 .roster-actions { margin-top: 8px; }
+.stats-meta { margin: 8px 0 0; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.stats-message.empty { margin: 8px 0; }
+.stats-groups { display: grid; gap: 8px; }
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 8px;
+}
+.stat-tile, .stat-skeleton {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--tile);
+  padding: 10px;
+}
+.stat-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; }
+.stat-label {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+.stat-value {
+  margin-top: 6px;
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.stat-tile.is-na .stat-value { color: var(--muted); font-size: 1.05rem; font-weight: 700; }
+.stat-note { margin-top: 4px; color: var(--muted); font-size: 11px; line-height: 1.3; }
+.rank-badge {
+  flex: none;
+  color: #fff;
+  background: var(--nfl-red);
+  border-radius: 999px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  line-height: 1.4;
+}
+.stat-skeleton { min-height: 76px; overflow: hidden; }
+.stat-skeleton-bar {
+  height: 10px;
+  margin-top: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--skeleton) 25%, var(--skeleton-shine) 37%, var(--skeleton) 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1.3s ease infinite;
+}
+.stat-skeleton-bar.short { width: 45%; height: 18px; }
+.stats-heading { margin-top: 12px; }
 .empty-state { padding: 8px 0 16px; color: var(--muted); }
 
 .skeleton {
@@ -437,13 +543,13 @@ dialog {
   box-shadow: var(--shadow);
 }
 dialog::backdrop { background: rgba(5, 10, 20, .62); }
-dialog h2 { margin: 0 0 8px; font-size: 1.15rem; }
+dialog h2 { margin: 0 0 8px; font-size: 1.15rem; letter-spacing: .08em; text-transform: uppercase; }
 .settings-row, .choice { display: flex; align-items: center; gap: 10px; min-height: 44px; }
 .settings-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
 .rank.flash, .record.flash, .sub.flash, .pts.flash { border-radius: 6px; animation: flash .9s ease; }
 
 @keyframes pulse {
-  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--good) 65%, transparent); }
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--nfl-red) 65%, transparent); }
   100% { box-shadow: 0 0 0 8px transparent; }
 }
 @keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
@@ -454,12 +560,10 @@ dialog h2 { margin: 0 0 8px; font-size: 1.15rem; }
 html.booting .panel { transition: none; }
 
 @media (max-width: 720px) {
-  .search { flex-basis: 100%; }
   .toolbar select, .toolbar > button { flex: 1 1 calc(50% - 8px); }
 }
 @media (max-width: 799px) {
   .sticky { background: var(--bg-raise); }
-  body::before { display: none; }
 }
 @media (max-width: 640px) {
   :root {
@@ -472,12 +576,12 @@ html.booting .panel { transition: none; }
   .team {
     grid-template-columns: 22px minmax(0, 1fr) 64px 12px;
     gap: 6px;
-    padding: 8px 48px 8px 10px;
+    padding: 8px 10px;
   }
   .head {
     grid-template-columns: 22px minmax(0, 1fr) 64px 12px;
     gap: 6px;
-    padding: 6px 48px 6px 10px;
+    padding: 6px 10px;
   }
   .logo-frame, .team-logo { width: 32px; height: 32px; }
   .identity { gap: 8px; }

@@ -355,10 +355,6 @@ async function main() {
     await page.evaluate(() => window.scrollTo(0, 0));
     await shot(page, 'standings-desktop-dark-expanded');
 
-    await page.locator('#search').fill('packers');
-    await page.locator('#filter-status', { hasText: 'Showing 1 of 32' }).waitFor();
-    assert(await visibleTeams(page).then(names => names.length === 1 && names[0] === 'Green Bay Packers'), 'search should keep the Packers');
-    await page.locator('#search').fill('');
     await page.locator('#conference').selectOption('NFC');
     await page.locator('#filter-status', { hasText: 'Showing 16 of 32' }).waitFor();
     await page.locator('#conference').selectOption('all');
@@ -374,24 +370,10 @@ async function main() {
     assert(live.length === 2 && live.includes('Buffalo Bills') && live.includes('Miami Dolphins'), `live filter ${live.join(', ')}`);
     await page.locator('#live-only').click();
     assert((await visibleTeams(page)).length === 32, 'clearing live filter restores every team');
-
-    await teamEntry(page, 'Buffalo Bills').locator('button.fav').click();
-    const pinned = await page.evaluate(() => {
-      const first = document.querySelector('.entry:not([hidden])');
-      return {
-        name: first.querySelector('.name').textContent,
-        rank: first.querySelector('.rank').textContent,
-        pressed: first.querySelector('button.fav').getAttribute('aria-pressed'),
-        jagRank: document.querySelector('#team-30 .rank').textContent
-      };
-    });
-    assert(pinned.name === 'Buffalo Bills', pinned.name);
-    assert(pinned.rank === '5', `favorite should keep its standings rank, got ${pinned.rank}`);
-    assert(pinned.pressed === 'true');
-    assert(pinned.jagRank === '1');
-    const storedFav = await page.evaluate(() => JSON.parse(localStorage.getItem('nfl-prefs-v1')).favoriteId);
-    assert(storedFav === '2', storedFav);
-    await teamEntry(page, 'Buffalo Bills').locator('button.fav').click();
+    assert(await page.locator('#search').count() === 0, 'team search should be gone');
+    assert(await page.locator('button.fav').count() === 0, 'favorite pin should be gone');
+    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('nfl-prefs-v1') || '{}'));
+    assert(stored.favoriteId == null, 'favorite id should not be stored');
 
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.locator('#team-30 button.team').focus();

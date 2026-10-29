@@ -256,7 +256,6 @@ async function main() {
     localStorage.setItem('nfl-prefs-v1', JSON.stringify({
       theme: 'dark',
       autoRefresh: true,
-      favoriteId: '<img src=x onerror=alert(1)>',
       expanded: ['<svg/onload=alert(1)>'],
       tabs: { '<x>': 'roster' },
       otherOpen: { '<x>': true }
@@ -475,23 +474,8 @@ async function main() {
     assert(hostile.includes('<img'), hostile);
     assert(await page.locator('img[src="x"]').count() === 0, 'API name was injected as HTML');
     assert(await page.evaluate(() => window.__xss) === undefined, 'name payload ran');
-    await page.locator('#search').fill('<img src=x onerror="window.__xss=2">');
-    await page.locator('#empty', { hasText: '<img src=x' }).waitFor();
-    assert(await page.locator('img[src="x"]').count() === 0, 'search query was injected as HTML');
-    await page.setViewportSize({ width: 1280, height: 900 });
-    await shot(page, 'harden-desktop-dark-search-empty');
-    await page.locator('#search').fill('');
-    await page.locator('#filter-status', { hasText: 'Showing 32 of 32' }).waitFor();
     state.xss = false;
     await refresh(page);
-
-    await page.locator('#search').fill('');
-    await page.locator('#search').focus();
-    await page.keyboard.type('packerszzz', { delay: 0 });
-    assert((await page.locator('#search').inputValue()) === 'packerszzz');
-    await page.locator('#empty').waitFor();
-    for (let i = 0; i < 'packerszzz'.length; i++) await page.keyboard.press('Backspace');
-    await page.locator('#filter-status', { hasText: 'Showing 32 of 32' }).waitFor();
 
     await page.getByRole('button', { name: 'Refresh now' }).dblclick();
     await page.getByRole('status').getByText(/^Updated/).waitFor();
@@ -520,7 +504,7 @@ async function main() {
     state.phase = 'normal';
 
     await page.keyboard.press('Escape');
-    await page.locator('#search').focus();
+    await page.locator('#conference').focus();
     let sawOutline = false;
     let opened = false;
     for (let i = 0; i < 40; i++) {
@@ -625,16 +609,22 @@ async function main() {
       if (theme === 'dark') await page.evaluate(() => { if (document.documentElement.dataset.theme !== 'dark') document.getElementById('theme-toggle').click(); });
       await page.setViewportSize({ width, height: width < 400 ? 780 : 900 });
       await page.evaluate(() => window.scrollTo(0, 0));
-      await page.locator('#search').fill('');
       await page.locator('#conference').selectOption('all');
       await page.locator('#division').selectOption('all');
+      if ((await page.locator('#live-only').getAttribute('aria-pressed')) === 'true') {
+        await page.locator('#live-only').click();
+      }
       const jagButton = page.locator('#team-30 button.team');
       const expanded = await jagButton.getAttribute('aria-expanded');
       if (mode === 'collapsed' && expanded === 'true') await jagButton.click();
       if (mode !== 'collapsed' && expanded !== 'true') await jagButton.click();
       if (mode === 'roster') await page.locator('#team-30').getByRole('tab', { name: 'Roster' }).click();
       if (mode === 'games') await page.locator('#team-30').getByRole('tab', { name: 'Games' }).click();
-      if (mode === 'empty') await page.locator('#search').fill('zzzz-no-such-team');
+      if (mode === 'empty') {
+        await page.locator('#conference').selectOption('NFC');
+        await page.locator('#live-only').click();
+        await page.locator('#empty', { hasText: 'No teams match those filters.' }).waitFor();
+      }
       if (mode === 'error') {
         state.phase = 'teams500';
         await page.getByRole('button', { name: 'Refresh now' }).click();

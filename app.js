@@ -20,7 +20,6 @@ const statusEl = document.querySelector('#status');
 const refresh = document.querySelector('#refresh');
 const banner = document.querySelector('#banner');
 const empty = document.querySelector('#empty');
-const search = document.querySelector('#search');
 const conferenceSelect = document.querySelector('#conference');
 const divisionSelect = document.querySelector('#division');
 const liveOnlyBtn = document.querySelector('#live-only');
@@ -35,7 +34,7 @@ const liveLabel = document.querySelector('#live-label');
 const autoRefreshInput = document.querySelector('#auto-refresh');
 const themeInputs = [...document.querySelectorAll('input[name="theme"]')];
 
-const prefs = { theme: 'system', autoRefresh: true, favoriteId: null, expanded: [], tabs: {}, otherOpen: {} };
+const prefs = { theme: 'system', autoRefresh: true, expanded: [], tabs: {}, otherOpen: {} };
 let timer = 0;
 let loadGen = 0;
 let activeLoad = null;
@@ -52,6 +51,9 @@ const panelState = new Map();
 const rosters = new Map();
 const rosterSeq = new Map();
 const parked = new Map();
+const statsByTeam = new Map();
+const statsSeq = new Map();
+const parkedStats = new Map();
 const headshotFailed = new Set();
 const logoFailed = new Set();
 const draftMem = new Map();
@@ -207,7 +209,7 @@ function hydratePanels() {
   const ids = new Set([...Object.keys(prefs.tabs || {}), ...Object.keys(prefs.otherOpen || {})]);
   for (const id of ids) {
     panelState.set(String(id), {
-      tab: prefs.tabs?.[id] === 'roster' ? 'roster' : 'games',
+      tab: prefs.tabs?.[id] === 'roster' ? 'roster' : prefs.tabs?.[id] === 'stats' ? 'stats' : 'games',
       otherOpen: !!prefs.otherOpen?.[id]
     });
   }
@@ -237,7 +239,7 @@ function applyTheme() {
   const theme = resolvedTheme();
   document.documentElement.dataset.theme = theme;
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', theme === 'light' ? '#e7eef6' : '#101827');
+  if (meta) meta.setAttribute('content', '#013369');
   updateThemeButton();
   for (const section of list.querySelectorAll('.entry')) {
     const team = teamById(section.dataset.teamId);
@@ -266,7 +268,6 @@ function armTimer() {
 }
 function currentFilters() {
   return {
-    query: search.value.trim().toLowerCase(),
     conference: conferenceSelect.value,
     division: divisionSelect.value,
     liveOnly: liveOnlyBtn.getAttribute('aria-pressed') === 'true'
@@ -288,25 +289,15 @@ function viewTeams() {
     if (filters.liveOnly && !team.games.some(game => game.live)) return false;
     if (filters.conference !== 'all' && team.conference !== filters.conference) return false;
     if (filters.division !== 'all' && `${team.conference} ${team.division}` !== filters.division) return false;
-    if (filters.query) {
-      const blob = `${team.city} ${team.name} ${team.abbr} ${team.conference} ${team.division}`.toLowerCase();
-      if (!blob.includes(filters.query)) return false;
-    }
     return true;
   });
-  if (prefs.favoriteId) {
-    rows = [...rows.filter(team => team.id === prefs.favoriteId), ...rows.filter(team => team.id !== prefs.favoriteId)];
-  }
   return rows;
 }
 function announceFilters() {
   const shown = [...list.querySelectorAll('.entry')].filter(el => !el.hidden).length;
   filterStatus.textContent = currentTeams.length ? `Showing ${shown} of ${currentTeams.length} teams` : '';
   empty.hidden = shown !== 0 || !currentTeams.length;
-  if (!empty.hidden && currentTeams.length) {
-    const query = search.value.trim();
-    empty.textContent = query ? `No teams match "${query}".` : 'No teams match those filters.';
-  }
+  if (!empty.hidden && currentTeams.length) empty.textContent = 'No teams match those filters.';
   clearTimeout(filterAnnounce);
   filterAnnounce = setTimeout(() => { filterLive.textContent = filterStatus.textContent; }, 250);
 }
@@ -515,8 +506,7 @@ function buildSection(id) {
       h('span', { class: 'id-text' }, [
         h('span', { class: 'name-line' }, [
           h('span', { class: 'name' }),
-          h('span', { class: 'live-pill', text: 'Live', hidden: true }),
-          h('span', { class: 'mine', text: 'My team', hidden: true })
+          h('span', { class: 'live-pill', text: 'Live', hidden: true })
         ]),
         h('span', { class: 'sub' }),
         createScorebox('scorebox row-score')
@@ -531,17 +521,18 @@ function buildSection(id) {
     gameSection('upcoming-sec', 'UPCOMING REGULAR-SEASON GAMES', 'upcoming-title'),
     gameSection('completed-sec', 'COMPLETED REGULAR-SEASON GAMES', '')
   ]);
-  const slot = h('div', { class: 'roster-slot', id: `roster-slot-${id}` });
-  const tabpanel = h('div', { class: 'tabpanels', id: `tabpanel-${id}`, role: 'tabpanel' }, [gamesMount, slot]);
+  const slot = h('div', { class: 'roster-slot', id: `roster-slot-${id}`, hidden: true });
+  const statsSlot = h('div', { class: 'stats-slot', id: `stats-slot-${id}`, hidden: true });
+  const tabpanel = h('div', { class: 'tabpanels', id: `tabpanel-${id}`, role: 'tabpanel' }, [gamesMount, slot, statsSlot]);
   const tabs = h('div', { class: 'tabs', role: 'tablist', 'aria-label': 'Team details' }, [
     makeTab(id, 'games', 'Games'),
-    makeTab(id, 'roster', 'Roster')
+    makeTab(id, 'roster', 'Roster'),
+    makeTab(id, 'stats', 'Stats')
   ]);
   const panel = h('div', { class: 'panel', id: `panel-${id}`, 'aria-hidden': 'true', inert: '' }, [
     h('div', { class: 'panel-clip' }, [tabs, tabpanel])
   ]);
-  const fav = h('button', { type: 'button', class: 'fav', 'data-id': id, 'aria-pressed': 'false', text: '★' });
-  const section = h('section', { class: 'entry', id: `team-${id}`, 'data-team-id': id, role: 'listitem' }, [teamBtn, fav, panel]);
+  const section = h('section', { class: 'entry', id: `team-${id}`, 'data-team-id': id, role: 'listitem' }, [teamBtn, panel]);
   section.querySelector('.row-score').hidden = true;
   return section;
 }
@@ -552,6 +543,16 @@ function ensureSection(team) {
   list.append(section);
   return section;
 }
+function detachSlot(map, id, slot, selector) {
+  const node = slot && slot.querySelector(selector);
+  if (!node) return;
+  map.set(id, node);
+  node.remove();
+}
+function attachSlot(map, id, slot) {
+  const node = map.get(id);
+  if (node && slot && node.parentNode !== slot) slot.append(node);
+}
 function syncTabState(section, team) {
   const tab = panelFor(team.id).tab;
   for (const button of section.querySelectorAll('button.tab')) {
@@ -560,33 +561,25 @@ function syncTabState(section, team) {
     setAttr(button, 'tabindex', on ? '0' : '-1');
   }
   const gamesMount = section.querySelector('.games-mount');
-  const slot = section.querySelector('.roster-slot');
+  const rosterSlot = section.querySelector('.roster-slot');
+  const statsSlot = section.querySelector('.stats-slot');
   const selected = section.querySelector('button.tab[aria-selected="true"]');
   const panelNode = section.querySelector('[role="tabpanel"]');
   if (selected && panelNode) setAttr(panelNode, 'aria-labelledby', selected.id);
-  if (tab === 'roster') {
-    gamesMount.hidden = true;
-    slot.hidden = false;
-    const node = parked.get(team.id);
-    if (node && node.parentNode !== slot) slot.append(node);
-  } else {
-    /* Detach the roster so its text is not in the document on the Games tab,
-       but keep the same nodes (and any loaded headshots) for the way back. */
-    const node = slot.querySelector(':scope > .roster-root');
-    if (node) {
-      parked.set(team.id, node);
-      node.remove();
-    }
-    slot.hidden = true;
-    gamesMount.hidden = false;
-  }
+  /* Detach the hidden tab so its text leaves the document, but keep the same
+     nodes for the way back. */
+  if (tab === 'roster') attachSlot(parked, team.id, rosterSlot);
+  else detachSlot(parked, team.id, rosterSlot, ':scope > .roster-root');
+  if (tab === 'stats') attachSlot(parkedStats, team.id, statsSlot);
+  else detachSlot(parkedStats, team.id, statsSlot, ':scope > .stats-root');
+  gamesMount.hidden = tab !== 'games';
+  rosterSlot.hidden = tab !== 'roster';
+  statsSlot.hidden = tab !== 'stats';
 }
 function patchSection(section, team, rank) {
   const open = expanded.has(team.id);
   const live = team.games.find(game => game.live);
-  const fav = prefs.favoriteId === team.id;
   section.classList.toggle('live-team', !!live);
-  section.classList.toggle('is-fav', fav);
   const accent = accentFor(team, isDark());
   if (section.style.getPropertyValue('--team') !== accent) section.style.setProperty('--team', accent);
   setText(section.querySelector('.rank'), String(rank), { flash: true });
@@ -595,7 +588,6 @@ function patchSection(section, team, rank) {
   if (logo && !logo.hasAttribute('loading')) logo.loading = rank <= 12 ? 'eager' : 'lazy';
   setText(section.querySelector('.name'), team.name);
   section.querySelector('.live-pill').hidden = !live;
-  section.querySelector('.mine').hidden = !fav;
   const diff = team.pf - team.pa;
   const place = team.conference && team.conference !== 'NFL' ? `${team.conference} ${team.division} · ` : '';
   setText(section.querySelector('.sub'), `${place}${(team.pct * 100).toFixed(1)}% · PD ${diff > 0 ? '+' : ''}${diff}`, { flash: true });
@@ -617,10 +609,6 @@ function patchSection(section, team, rank) {
   const teamBtn = section.querySelector('button.team');
   setAttr(teamBtn, 'aria-expanded', open ? 'true' : 'false');
   section.querySelector('.arrow').classList.toggle('open', open);
-  const favBtn = section.querySelector('button.fav');
-  setAttr(favBtn, 'aria-pressed', fav ? 'true' : 'false');
-  setAttr(favBtn, 'aria-label', `${fav ? 'Remove' : 'Pin'} ${team.name} as my team`);
-  favBtn.classList.toggle('on', fav);
   const panel = section.querySelector('.panel');
   panel.classList.toggle('open', open);
   if (open) {
@@ -634,6 +622,7 @@ function patchSection(section, team, rank) {
   syncGames(section, team);
   syncTabState(section, team);
   if (open && panelFor(team.id).tab === 'roster') ensureRoster(team.id);
+  if (open && panelFor(team.id).tab === 'stats') ensureStats(team.id);
 }
 /* Reorder with insertBefore so existing team nodes stay the same objects.
    Scroll and focus are put back because moving a node can nudge both. */
@@ -698,7 +687,6 @@ function syncLiveStrip() {
 }
 function showTeam(id) {
   if (!viewTeams().some(team => team.id === id)) {
-    search.value = '';
     conferenceSelect.value = 'all';
     divisionSelect.value = 'all';
     liveOnlyBtn.setAttribute('aria-pressed', 'false');
@@ -766,8 +754,7 @@ function noteSuccess(failures, gameCount, manual = false) {
   if (filterStatus.textContent !== filterText) filterStatus.textContent = filterText;
   if (shown === 0 && currentTeams.length) {
     empty.hidden = false;
-    const query = search.value.trim();
-    empty.textContent = query ? `No teams match "${query}".` : 'No teams match those filters.';
+    empty.textContent = 'No teams match those filters.';
   } else empty.hidden = true;
 }
 function failLoad(err) {
@@ -1077,9 +1064,161 @@ function onHeadshotError(img) {
   fallback.textContent = img.dataset.initials || '?';
   img.replaceWith(fallback);
 }
+function buildTile() {
+  return h('div', { class: 'stat-tile' }, [
+    h('div', { class: 'stat-top' }, [
+      h('div', { class: 'stat-label' }),
+      h('span', { class: 'rank-badge', hidden: true })
+    ]),
+    h('div', { class: 'stat-value' }),
+    h('div', { class: 'stat-note', hidden: true })
+  ]);
+}
+function patchTile(el, tile) {
+  setText(el.querySelector('.stat-label'), tile.label || '');
+  const missing = tile.display == null || String(tile.display).trim() === '';
+  el.classList.toggle('is-na', missing);
+  setText(el.querySelector('.stat-value'), missing ? 'n/a' : tile.display);
+  const note = el.querySelector('.stat-note');
+  if (tile.computed) {
+    note.hidden = false;
+    setText(note, 'Per game, from total');
+  } else {
+    note.hidden = true;
+    setText(note, '');
+  }
+  const badge = el.querySelector('.rank-badge');
+  const rank = Number(tile.rank);
+  if (Number.isInteger(rank) && rank > 0) {
+    badge.hidden = false;
+    setText(badge, `#${rank}`);
+    setAttr(badge, 'aria-label', `League rank ${rank}`);
+  } else {
+    badge.hidden = true;
+    setText(badge, '');
+    badge.removeAttribute('aria-label');
+  }
+}
+function buildStatsRoot(id) {
+  const skeletons = h('div', { class: 'stat-grid stats-skeletons', 'aria-hidden': 'true' });
+  for (let i = 0; i < 6; i++) {
+    skeletons.append(h('div', { class: 'stat-skeleton' }, [
+      h('div', { class: 'stat-skeleton-bar' }),
+      h('div', { class: 'stat-skeleton-bar short' })
+    ]));
+  }
+  const group = name => h('section', { class: 'stats-group', 'data-group': name }, [
+    h('h3', { class: 'section-title stats-heading', text: name }),
+    h('div', { class: 'stat-grid' })
+  ]);
+  const root = h('div', { class: 'stats-root' }, [
+    h('p', { class: 'stats-message sr-only', text: 'Loading stats…' }),
+    h('div', { class: 'roster-actions' }, [
+      h('button', { type: 'button', class: 'retry', 'data-stats-retry': id, text: 'Retry', hidden: true })
+    ]),
+    h('p', { class: 'stats-meta', hidden: true }),
+    skeletons,
+    h('div', { class: 'stats-groups', hidden: true }, [group('Offense'), group('Defense')])
+  ]);
+  return root;
+}
+function patchStatsRoot(root, id, record) {
+  const state = record?.state || 'loading';
+  const message = root.querySelector('.stats-message');
+  const retry = root.querySelector('[data-stats-retry]');
+  const meta = root.querySelector('.stats-meta');
+  const skeletons = root.querySelector('.stats-skeletons');
+  const groups = root.querySelector('.stats-groups');
+  if (retry) retry.dataset.statsRetry = id;
+  const showSaved = root.dataset.ready === '1' && state === 'loading';
+  if (state === 'loading' && !showSaved) {
+    message.className = 'stats-message sr-only';
+    setText(message, 'Loading stats…');
+    if (retry) retry.hidden = true;
+    meta.hidden = true;
+    skeletons.hidden = false;
+    groups.hidden = true;
+    return;
+  }
+  if (state === 'loading') {
+    message.className = 'stats-message sr-only';
+    setText(message, 'Loading stats…');
+    if (retry) retry.hidden = true;
+    return;
+  }
+  if (state === 'error' || state === 'unavailable') {
+    message.className = 'stats-message empty';
+    setText(message, state === 'unavailable' ? 'Stats are not available yet.' : (record.error || 'Could not load stats.'));
+    if (retry) retry.hidden = false;
+    meta.hidden = true;
+    skeletons.hidden = true;
+    groups.hidden = true;
+    return;
+  }
+  root.dataset.ready = '1';
+  message.className = 'stats-message sr-only';
+  setText(message, 'Season stats');
+  if (retry) retry.hidden = true;
+  skeletons.hidden = true;
+  groups.hidden = false;
+  const games = record.data && record.data.gamesPlayed;
+  if (games) {
+    meta.hidden = false;
+    setText(meta, `${games} games played`);
+  } else {
+    meta.hidden = true;
+    setText(meta, '');
+  }
+  const offense = [...(record.data?.offense || [])];
+  const defense = [...(record.data?.defense || [])];
+  reconcile(root.querySelector('[data-group="Offense"] .stat-grid'), offense, tile => String(tile.key), () => buildTile(), patchTile);
+  reconcile(root.querySelector('[data-group="Defense"] .stat-grid'), defense, tile => String(tile.key), () => buildTile(), patchTile);
+}
+function paintStats(id) {
+  let root = parkedStats.get(id);
+  if (!root) {
+    root = buildStatsRoot(id);
+    parkedStats.set(id, root);
+  }
+  patchStatsRoot(root, id, statsByTeam.get(id));
+  const slot = document.getElementById('stats-slot-' + id);
+  const show = expanded.has(id) && panelFor(id).tab === 'stats';
+  if (show && slot && root.parentNode !== slot) slot.append(root);
+}
+function statsPayloadOk(data) {
+  return !!(data && typeof data === 'object' && !Array.isArray(data) && Array.isArray(data.offense) && Array.isArray(data.defense) && !(data.message && data.endpoints));
+}
+async function ensureStats(id, { force = false } = {}) {
+  const current = statsByTeam.get(id);
+  if (!force && current && current.state !== 'idle') return;
+  const seq = (statsSeq.get(id) || 0) + 1;
+  statsSeq.set(id, seq);
+  statsByTeam.set(id, { state: 'loading', data: current?.state === 'ready' ? current.data : null, error: null });
+  if (current?.state === 'ready') parkedStats.get(id)?.setAttribute('data-ready', '1');
+  paintStats(id);
+  try {
+    const response = await fetch(`${BASE}/stats?team=${encodeURIComponent(id)}`, { cache: 'no-store' });
+    if (statsSeq.get(id) !== seq) return;
+    let data = null;
+    try { data = await response.json(); } catch { data = null; }
+    if (statsSeq.get(id) !== seq) return;
+    if (response.status === 404 || data?.unavailable || (response.ok && !statsPayloadOk(data)) || data == null) {
+      statsByTeam.set(id, { state: 'unavailable', data: null, error: null });
+    } else if (!response.ok) {
+      statsByTeam.set(id, { state: 'error', data: null, error: `Could not load stats (HTTP ${response.status}).` });
+    } else {
+      statsByTeam.set(id, { state: 'ready', data, error: null });
+    }
+  } catch {
+    if (statsSeq.get(id) !== seq) return;
+    statsByTeam.set(id, { state: 'error', data: null, error: 'Could not load stats. Check your connection and try again.' });
+  }
+  if (statsSeq.get(id) !== seq) return;
+  paintStats(id);
+}
 function onTabClick(tab) {
   const id = tab.dataset.team;
-  const name = tab.dataset.tab === 'roster' ? 'roster' : 'games';
+  const name = tab.dataset.tab === 'roster' ? 'roster' : tab.dataset.tab === 'stats' ? 'stats' : 'games';
   savePanel(id, { tab: name });
   persistPrefs();
   const section = document.getElementById('team-' + id);
@@ -1087,15 +1226,18 @@ function onTabClick(tab) {
   if (!section || !team) return;
   syncTabState(section, team);
   if (name === 'roster') ensureRoster(id);
+  if (name === 'stats') ensureStats(id);
 }
 
 list.addEventListener('click', event => {
   const tab = event.target.closest('button.tab');
   if (tab) { onTabClick(tab); return; }
   const retry = event.target.closest('button.retry');
-  if (retry) { ensureRoster(retry.dataset.rosterRetry, { force: true }); return; }
-  const fav = event.target.closest('button.fav');
-  if (fav) { prefs.favoriteId = prefs.favoriteId === fav.dataset.id ? null : fav.dataset.id; persistPrefs(); syncList(); return; }
+  if (retry) {
+    if (retry.dataset.statsRetry) ensureStats(retry.dataset.statsRetry, { force: true });
+    else ensureRoster(retry.dataset.rosterRetry, { force: true });
+    return;
+  }
   const teamBtn = event.target.closest('button.team');
   if (teamBtn) toggleTeam(teamBtn.dataset.id);
 });
@@ -1132,7 +1274,6 @@ liveStrip.addEventListener('click', event => {
   const chip = event.target.closest('.live-chip');
   if (chip?.dataset.teamId) showTeam(chip.dataset.teamId);
 });
-search.addEventListener('input', onFilterChange);
 conferenceSelect.addEventListener('change', onFilterChange);
 divisionSelect.addEventListener('change', onFilterChange);
 liveOnlyBtn.addEventListener('click', () => {
@@ -1205,7 +1346,7 @@ function registerShellWorker() {
 }
 
 if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
-  globalThis.__nflTest = { ensureRoster, load };
+  globalThis.__nflTest = { ensureRoster, ensureStats, load };
 }
 
 loadPrefs();

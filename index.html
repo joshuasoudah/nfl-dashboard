@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="description" content="Live NFL regular-season standings ranked by winning percentage, with scores, schedules, and depth charts.">
-<meta name="theme-color" content="#101827">
+<meta name="description" content="Unofficial regular-season standings, scores, schedules, and depth charts. Not affiliated with the NFL.">
+<meta name="theme-color" content="#013369">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="NFL Standings">
-<meta property="og:title" content="NFL Standings">
-<meta property="og:description" content="Live NFL regular-season standings, scores, schedules, and depth charts.">
+<meta name="apple-mobile-web-app-title" content="Standings">
+<meta property="og:title" content="Standings">
+<meta property="og:description" content="Unofficial regular-season standings, scores, schedules, and depth charts.">
 <meta property="og:type" content="website">
-<title>NFL Standings</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23101827'/%3E%3Cpath d='M12 40Q32 10 52 40Q32 54 12 40Z' fill='%23f4f7fb' transform='rotate(-28 32 32)'/%3E%3Cpath d='M24 28l14 16M26 33l6-4M24 38l6-4M22 43l6-4' stroke='%23101827' stroke-width='2' stroke-linecap='round' transform='rotate(-28 32 32)'/%3E%3C/svg%3E">
+<title>Standings</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23013369'/%3E%3Cpath d='M12 40Q32 10 52 40Q32 54 12 40Z' fill='%23f4f7fb' transform='rotate(-28 32 32)'/%3E%3Cpath d='M24 28l14 16M26 33l6-4M24 38l6-4M22 43l6-4' stroke='%23D50A0A' stroke-width='2' stroke-linecap='round' transform='rotate(-28 32 32)'/%3E%3C/svg%3E">
 <link rel="apple-touch-icon" href="icon.svg">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="stylesheet" href="styles.css">
@@ -22,17 +22,17 @@ try {
   var choice = theme === 'light' || theme === 'dark' ? theme : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   document.documentElement.dataset.theme = choice;
   var themeMeta = document.querySelector('meta[name="theme-color"]');
-  if (themeMeta) themeMeta.setAttribute('content', choice === 'light' ? '#e7eef6' : '#101827');
+  if (themeMeta) themeMeta.setAttribute('content', '#013369');
 } catch (error) { /* keep the default dark theme */ }
 </script>
 </head>
 <body>
 <main>
   <div class="sticky">
-    <header>
+    <header class="scoreboard">
       <div class="brand">
         <div>
-          <h1>NFL Standings</h1>
+          <h1>STANDINGS</h1>
           <p id="season">Regular season</p>
           <p class="live-state" id="live-state"><span id="live-dot" class="live-dot" aria-hidden="true"></span><span id="live-label">Live</span></p>
         </div>
@@ -43,7 +43,6 @@ try {
       </div>
     </header>
     <div class="toolbar">
-      <label class="search"><span class="sr-only">Search teams</span><input id="search" type="search" placeholder="Search teams" autocomplete="off" enterkeyhint="search"></label>
       <select id="conference" aria-label="Conference">
         <option value="all">All conferences</option>
         <option value="AFC">AFC</option>
@@ -82,8 +81,8 @@ try {
     <div class="skeleton"></div>
   </div>
   <footer>
-    <p>Sorted by winning percentage (ties count as half a win), then wins, point differential, and team name. Your pinned team stays on top. Regular-season standings only. Playoff and upcoming games are inside each team.</p>
-    <p>Data from <a href="https://www.espn.com/nfl/" rel="noopener noreferrer">ESPN</a>. Unofficial and may be delayed. This site is not affiliated with the NFL or ESPN.</p>
+    <p>Sorted by winning percentage (ties count as half a win), then wins, point differential, and team name. Regular-season standings only. Playoff and upcoming games are inside each team.</p>
+    <p>Data is unofficial and comes from <a href="https://www.espn.com/nfl/" rel="noopener noreferrer">ESPN</a>. This app is not affiliated with the NFL.</p>
   </footer>
 </main>
 <dialog id="settings" aria-labelledby="settings-title">
