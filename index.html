@@ -67,7 +67,13 @@ try {
       <p class="meta as-of" id="as-of" aria-hidden="true"></p>
     </div>
     <div id="banner" class="banner" role="alert" hidden></div>
-    <div id="live-strip" class="live-strip" hidden></div>
+    <div id="live-bar" class="live-bar" hidden>
+      <button type="button" id="live-strip-toggle" class="live-strip-toggle" aria-expanded="true" aria-controls="live-strip">
+        <span class="live-strip-dot" aria-hidden="true"></span>
+        <span id="live-strip-count">Live</span>
+      </button>
+      <div id="live-strip" class="live-strip" role="region" aria-label="Live games"></div>
+    </div>
     <p id="filter-status"></p>
     <div class="head"><span>#</span><span>Team</span><span class="record-h">W-L-T</span><span></span></div>
   </div>

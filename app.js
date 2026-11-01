@@ -22,7 +22,10 @@ const empty = document.querySelector('#empty');
 const conferenceSelect = document.querySelector('#conference');
 const divisionSelect = document.querySelector('#division');
 const liveOnlyBtn = document.querySelector('#live-only');
+const liveBar = document.querySelector('#live-bar');
 const liveStrip = document.querySelector('#live-strip');
+const liveStripToggle = document.querySelector('#live-strip-toggle');
+const liveStripCount = document.querySelector('#live-strip-count');
 const filterStatus = document.querySelector('#filter-status');
 const filterLive = document.querySelector('#filter-live');
 const scoreLive = document.querySelector('#score-live');
@@ -33,7 +36,7 @@ const liveLabel = document.querySelector('#live-label');
 const autoRefreshInput = document.querySelector('#auto-refresh');
 const themeInputs = [...document.querySelectorAll('input[name="theme"]')];
 
-const prefs = { theme: 'system', autoRefresh: true, expanded: [], tabs: {}, otherOpen: {} };
+const prefs = { theme: 'system', autoRefresh: true, liveStripCollapsed: false, expanded: [], tabs: {}, otherOpen: {} };
 let timer = 0;
 let loadGen = 0;
 let activeLoad = null;
@@ -660,7 +663,13 @@ function syncLiveStrip() {
       games.push({ key, team, game });
     }
   }
-  liveStrip.hidden = games.length === 0;
+  const collapsed = prefs.liveStripCollapsed === true;
+  liveBar.hidden = games.length === 0;
+  liveBar.classList.toggle('is-collapsed', collapsed);
+  liveStrip.hidden = games.length === 0 || collapsed;
+  setAttr(liveStripToggle, 'aria-expanded', collapsed ? 'false' : 'true');
+  setAttr(liveStripToggle, 'aria-label', collapsed ? `Show ${games.length} live games` : `Hide ${games.length} live games`);
+  setText(liveStripCount, games.length ? `${games.length} live` : 'Live');
   reconcile(liveStrip, games, item => item.key, () => {
     return h('button', { type: 'button', class: 'live-chip' }, [
       h('span', { class: 'logo-slot' }, [h('img', { class: 'score-logo chip-logo', alt: '', width: '15', height: '15', decoding: 'async' })]),
@@ -1261,6 +1270,11 @@ document.addEventListener('error', event => {
 liveStrip.addEventListener('click', event => {
   const chip = event.target.closest('.live-chip');
   if (chip?.dataset.teamId) showTeam(chip.dataset.teamId);
+});
+liveStripToggle.addEventListener('click', () => {
+  prefs.liveStripCollapsed = prefs.liveStripCollapsed !== true;
+  persistPrefs();
+  syncLiveStrip();
 });
 conferenceSelect.addEventListener('change', onFilterChange);
 divisionSelect.addEventListener('change', onFilterChange);
