@@ -183,6 +183,11 @@ test('saved preferences and draft cache reject corrupt or hostile values', () =>
   });
   assert.equal(clean.theme, 'system');
   assert.equal(clean.autoRefresh, true);
+  assert.equal(clean.liveStripCollapsed, false);
+  assert.equal(sanitizePrefs(null).liveStripCollapsed, false);
+  assert.equal(sanitizePrefs({ liveStripCollapsed: true }).liveStripCollapsed, true);
+  assert.equal(sanitizePrefs({ liveStripCollapsed: 'true' }).liveStripCollapsed, false);
+  assert.equal(sanitizePrefs({ liveStripCollapsed: 1 }).liveStripCollapsed, false);
   assert.equal('favoriteId' in clean, false);
   assert.deepEqual(clean.expanded, ['30', '2']);
   assert.deepEqual(clean.tabs, { '30': 'roster', '15': 'games', '34': 'stats' });

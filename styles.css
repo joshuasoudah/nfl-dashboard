@@ -239,20 +239,89 @@ h1 {
   color: var(--danger-text);
   border: 1px solid var(--danger-border);
 }
-.live-strip { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 8px; }
-.live-chip {
+.live-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 8px;
+  min-width: 0;
+}
+.live-strip-toggle {
+  flex: none;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 44px;
-  max-width: 100%;
-  padding: 6px 10px;
+  min-width: 44px;
+  min-height: 32px;
+  padding: 4px 8px;
   border-radius: 999px;
-  border: 1px solid transparent;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.live-strip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
   background: var(--playing);
-  color: var(--playing-ink);
+  flex: none;
+}
+.live-strip-toggle::after {
+  content: "";
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-bottom: 5px solid currentColor;
+}
+.live-bar.is-collapsed .live-strip-toggle::after {
+  border-bottom: 0;
+  border-top: 5px solid currentColor;
+}
+.live-strip {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.live-strip::-webkit-scrollbar { display: none; height: 0; }
+.live-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  max-width: none;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--playing);
+  background: var(--card);
+  color: var(--text);
+  font-size: 12px;
   font-weight: 700;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
+}
+.live-chip::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--playing);
+  flex: none;
 }
 .head {
   display: grid;

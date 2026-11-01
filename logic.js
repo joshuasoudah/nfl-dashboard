@@ -93,10 +93,11 @@ export function normalizeDraft(draft) {
 }
 
 export function sanitizePrefs(raw) {
-  const prefs = { theme: 'system', autoRefresh: true, expanded: [], tabs: {}, otherOpen: {} };
+  const prefs = { theme: 'system', autoRefresh: true, liveStripCollapsed: false, expanded: [], tabs: {}, otherOpen: {} };
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return prefs;
   if (raw.theme === 'light' || raw.theme === 'dark' || raw.theme === 'system') prefs.theme = raw.theme;
   if (typeof raw.autoRefresh === 'boolean') prefs.autoRefresh = raw.autoRefresh;
+  if (typeof raw.liveStripCollapsed === 'boolean') prefs.liveStripCollapsed = raw.liveStripCollapsed;
   if (Array.isArray(raw.expanded)) {
     for (const value of raw.expanded) {
       const id = cleanTeamId(value);
