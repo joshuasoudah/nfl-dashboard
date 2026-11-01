@@ -67,34 +67,6 @@ export function winningPercentage(wins, losses, ties) {
   return played ? (wins + ties / 2) / played : 0;
 }
 
-function luminance(hex) {
-  const n = parseInt(String(hex).replace('#', ''), 16);
-  if (!Number.isFinite(n)) return 0;
-  return (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255;
-}
-
-function lighten(hex, amount) {
-  const n = parseInt(String(hex).replace('#', ''), 16);
-  const channel = value => Math.max(0, Math.min(255, Math.round(value + (255 - value) * amount)));
-  const r = channel((n >> 16) & 255);
-  const g = channel((n >> 8) & 255);
-  const b = channel(n & 255);
-  return '#' + [r, g, b].map(value => value.toString(16).padStart(2, '0')).join('');
-}
-
-export function accentFor(team, dark) {
-  const primary = team?.color || '#5b6b82';
-  const alt = team?.alt || '#8aa0bd';
-  if (dark) {
-    if (luminance(primary) >= 0.28) return primary;
-    if (luminance(alt) >= 0.28) return alt;
-    return lighten(primary, 0.55);
-  }
-  if (luminance(primary) <= 0.72) return primary;
-  if (luminance(alt) <= 0.72) return alt;
-  return '#1d4e89';
-}
-
 function httpUrl(value) {
   const text = String(value || '').trim();
   return /^https?:\/\//i.test(text) ? text : '';

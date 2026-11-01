@@ -1,5 +1,4 @@
 import {
-  accentFor,
   computeStandings,
   normalizeDraft,
   safe,
@@ -71,9 +70,6 @@ const fmt = date => new Date(date).toLocaleDateString('en-US', { month: 'short',
 const kickoff = date => new Date(date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago', timeZoneName: 'short' });
 function nowTime(date = new Date()) {
   return new Date(date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago', timeZoneName: 'short' });
-}
-function isDark() {
-  return document.documentElement.dataset.theme !== 'light';
 }
 function requestTimeoutMs() {
   const host = location.hostname;
@@ -241,12 +237,6 @@ function applyTheme() {
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', '#013369');
   updateThemeButton();
-  for (const section of list.querySelectorAll('.entry')) {
-    const team = teamById(section.dataset.teamId);
-    if (!team) continue;
-    const accent = accentFor(team, isDark());
-    if (section.style.getPropertyValue('--team') !== accent) section.style.setProperty('--team', accent);
-  }
 }
 function syncSettingsForm() {
   autoRefreshInput.checked = prefs.autoRefresh !== false;
@@ -580,8 +570,6 @@ function patchSection(section, team, rank) {
   const open = expanded.has(team.id);
   const live = team.games.find(game => game.live);
   section.classList.toggle('live-team', !!live);
-  const accent = accentFor(team, isDark());
-  if (section.style.getPropertyValue('--team') !== accent) section.style.setProperty('--team', accent);
   setText(section.querySelector('.rank'), String(rank), { flash: true });
   const logo = section.querySelector('.team-logo');
   setLogo(logo, team.logo, '');
