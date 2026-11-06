@@ -31,10 +31,14 @@ test('service worker is network-first, bypasses the HTTP cache, and never touche
   assert.equal(parsed.start_url, './');
   assert.equal(parsed.scope, './');
   assert.equal(parsed.icons[0].src, 'icon.svg');
+  assert.equal(parsed.icons[1].src, 'apple-touch-icon.png');
+  assert.equal(parsed.icons[1].sizes, '180x180');
 });
 
 test('page keeps the manifest, favicon, and saved preferences', () => {
   assert.match(html, /rel="manifest"/);
+  assert.match(html, /rel="apple-touch-icon" href="apple-touch-icon\.png"/);
+  assert.equal(html.includes('apple-touch-icon" href="icon.svg"'), false);
   assert.match(html, /data:image\/svg\+xml/);
   assert.match(html, /styles\.css/);
   assert.match(html, /app\.js/);
