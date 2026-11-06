@@ -2,8 +2,8 @@
    deploy shows up on the next reload instead of lingering in the browser cache.
    The Cache API is only an offline fallback. Cross-origin requests, including
    the NFL data API, are not intercepted and are never stored. */
-const CACHE = 'nfl-shell-v4';
-const SHELL = /\/(?:index\.html|styles\.css|app\.js|logic\.js|manifest\.webmanifest|icon\.svg)$/;
+const CACHE = 'nfl-shell-v5';
+const SHELL = /\/(?:index\.html|styles\.css|app\.js|logic\.js|manifest\.webmanifest|icon\.svg|apple-touch-icon\.png)$/;
 
 function isShell(pathname) {
   return pathname.endsWith('/') || SHELL.test(pathname);
