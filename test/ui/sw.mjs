@@ -94,7 +94,7 @@ async function main() {
     });
     assert(manifest.start === '/nfl-dashboard/' || manifest.start === '/nfl-dashboard/index.html', manifest.start);
     assert(manifest.scope === '/nfl-dashboard/', manifest.scope);
-    assert(manifest.icon === '/nfl-dashboard/icon.svg', manifest.icon);
+    assert(manifest.icon === '/nfl-dashboard/Cinematic%20NFL%20Stadium%20Shield%20Icon.png', manifest.icon);
     assert(manifest.iconStatus === 200, 'icon path failed');
 
     await page.reload({ waitUntil: 'domcontentloaded' });

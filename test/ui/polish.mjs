@@ -428,11 +428,11 @@ async function main() {
     const prefs = await page.evaluate(() => JSON.parse(localStorage.getItem('nfl-prefs-v1')));
     assert(prefs.theme === 'dark', prefs.theme);
     assert(!prefs.expanded?.length, 'open teams are not saved across visits');
-    await page.locator('#conference').selectOption('NFC');
-    await page.locator('#division').selectOption('NFC South');
     const jagForReload = page.locator('#team-30');
     if ((await jagForReload.locator('button.team').getAttribute('aria-expanded')) !== 'true') await jagForReload.locator('button.team').click();
     await jagForReload.getByRole('tab', { name: 'Roster' }).click();
+    await page.locator('#conference').selectOption('NFC');
+    await page.locator('#division').selectOption('NFC South');
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.getByRole('status').getByText(/^Updated/).waitFor();
     assert(await page.locator('#team-30 button.team').getAttribute('aria-expanded') === 'false', 'reload closes open teams');
