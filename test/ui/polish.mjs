@@ -427,11 +427,65 @@ async function main() {
 
     const prefs = await page.evaluate(() => JSON.parse(localStorage.getItem('nfl-prefs-v1')));
     assert(prefs.theme === 'dark', prefs.theme);
-    assert(prefs.expanded.includes('30'), 'expanded team should be remembered');
+    assert(!prefs.expanded?.length, 'open teams are not saved across visits');
+    const jagForReload = page.locator('#team-30');
+    if ((await jagForReload.locator('button.team').getAttribute('aria-expanded')) !== 'true') await jagForReload.locator('button.team').click();
+    await jagForReload.getByRole('tab', { name: 'Roster' }).click();
+    await page.locator('#conference').selectOption('NFC');
+    await page.locator('#division').selectOption('NFC South');
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.getByRole('status').getByText(/^Updated/).waitFor();
-    assert(await page.locator('#team-30 button.team').getAttribute('aria-expanded') === 'true', 'expanded team should survive reload');
+    assert(await page.locator('#team-30 button.team').getAttribute('aria-expanded') === 'false', 'reload closes open teams');
+    assert(await page.locator('#conference').inputValue() === 'all', 'reload clears the conference filter');
+    assert(await page.locator('#division').inputValue() === 'all', 'reload clears the division filter');
     assert(await page.evaluate(() => document.documentElement.dataset.theme) === 'dark');
+    await page.locator('#conference').selectOption('AFC');
+    await page.locator('#live-only').click();
+    await page.locator('#team-2 button.team').click();
+    await page.locator('#team-2').getByRole('tab', { name: 'Roster' }).click();
+    const duringUse = await page.evaluate(() => {
+      window.dispatchEvent(new Event('blur'));
+      window.dispatchEvent(new Event('focus'));
+      const select = document.getElementById('conference');
+      select.focus();
+      let hidden = false;
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
+      const flip = value => {
+        hidden = value;
+        document.dispatchEvent(new Event('visibilitychange'));
+      };
+      flip(true);
+      flip(false);
+      select.blur();
+      const kept = {
+        conference: document.getElementById('conference').value,
+        live: document.getElementById('live-only').getAttribute('aria-pressed'),
+        expanded: document.querySelector('#team-2 button.team').getAttribute('aria-expanded'),
+        tab: document.querySelector('#team-2 button.tab[aria-selected="true"]')?.textContent || ''
+      };
+      flip(true);
+      flip(false);
+      window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
+      document.dispatchEvent(new Event('resume'));
+      const reopened = {
+        conference: document.getElementById('conference').value,
+        division: document.getElementById('division').value,
+        live: document.getElementById('live-only').getAttribute('aria-pressed'),
+        expanded: document.querySelector('#team-2 button.team').getAttribute('aria-expanded'),
+        tab: document.querySelector('#team-2 button.tab[aria-selected="true"]')?.textContent || ''
+      };
+      delete document.hidden;
+      return { kept, reopened };
+    });
+    assert(duringUse.kept.conference === 'AFC' && duringUse.kept.live === 'true', 'an open filter menu is not a reopen');
+    assert(duringUse.kept.expanded === 'true' && duringUse.kept.tab === 'Roster', 'focus and the picker keep the open team');
+    assert(duringUse.reopened.conference === 'all' && duringUse.reopened.division === 'all', 'reopen clears filters');
+    assert(duringUse.reopened.live === 'false', 'reopen clears the live filter');
+    assert(duringUse.reopened.expanded === 'false', 'reopen closes team panels');
+    await page.getByRole('status').getByText(/^Updated/).waitFor();
+    await page.locator('#team-2 button.team').click();
+    await page.locator('#team-2').getByRole('tab', { name: 'Games', selected: true }).waitFor();
+    assert(await page.evaluate(() => JSON.parse(localStorage.getItem('nfl-prefs-v1')).theme) === 'dark');
 
     assert(pageErrors.length === 0, pageErrors.join('\n'));
     console.log('UI polish checks passed');
