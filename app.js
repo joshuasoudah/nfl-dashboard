@@ -202,28 +202,59 @@ function loadPrefs() {
     const raw = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
     Object.assign(prefs, sanitizePrefs(raw));
   } catch { /* private mode or unreadable storage */ }
-}
-function hydratePanels() {
-  for (const id of prefs.expanded || []) expanded.add(String(id));
-  const ids = new Set([...Object.keys(prefs.tabs || {}), ...Object.keys(prefs.otherOpen || {})]);
-  for (const id of ids) {
-    panelState.set(String(id), {
-      tab: prefs.tabs?.[id] === 'roster' ? 'roster' : prefs.tabs?.[id] === 'stats' ? 'stats' : 'games',
-      otherOpen: !!prefs.otherOpen?.[id]
-    });
-  }
+  /* Open teams, tabs, and the other-roster disclosure are for this visit only. */
+  prefs.expanded = [];
+  prefs.tabs = {};
+  prefs.otherOpen = {};
 }
 function persistPrefs() {
-  const tabs = {};
-  const otherOpen = {};
-  for (const [id, state] of panelState) {
-    tabs[id] = state.tab;
-    if (state.otherOpen) otherOpen[id] = true;
-  }
-  prefs.expanded = [...expanded];
-  prefs.tabs = tabs;
-  prefs.otherOpen = otherOpen;
+  prefs.expanded = [];
+  prefs.tabs = {};
+  prefs.otherOpen = {};
   try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch { /* quota or private mode */ }
+}
+/* A fresh visit, a back-forward cache restore, or returning to a hidden app
+   starts on All conferences, the Games tab, and closed team panels. Theme,
+   auto-refresh, live-strip collapse, and fetched data stay. An open
+   conference or division picker, and ordinary focus changes, do not reset. */
+let leftWhileHidden = false;
+function selectGuardActive() {
+  const active = document.activeElement;
+  return !!active && active.tagName === 'SELECT';
+}
+function selectionDirty() {
+  if (expanded.size > 0 || settingsDialog.open) return true;
+  if (conferenceSelect.value !== 'all' || divisionSelect.value !== 'all') return true;
+  if (liveOnlyBtn.getAttribute('aria-pressed') === 'true') return true;
+  for (const state of panelState.values()) {
+    if (state.tab !== 'games' || state.otherOpen) return true;
+  }
+  if (document.querySelector('details.other-roster[open]')) return true;
+  for (const node of parked.values()) {
+    if (node.querySelector?.('details.other-roster[open]')) return true;
+  }
+  return false;
+}
+function closeOtherRosters() {
+  const roots = [document, ...parked.values()];
+  for (const root of roots) {
+    if (!root.querySelectorAll) continue;
+    for (const details of root.querySelectorAll('details.other-roster[open]')) details.open = false;
+  }
+}
+function resetViewSelections() {
+  if (!selectionDirty()) return;
+  expanded.clear();
+  panelState.clear();
+  closeOtherRosters();
+  conferenceSelect.value = 'all';
+  divisionSelect.value = 'all';
+  liveOnlyBtn.setAttribute('aria-pressed', 'false');
+  syncDivisionOptions();
+  if (settingsDialog.open) settingsDialog.close();
+  if (!list.querySelector('.entry')) return;
+  syncList();
+  announceFilters();
 }
 function resolvedTheme() {
   if (prefs.theme === 'light' || prefs.theme === 'dark') return prefs.theme;
@@ -1318,10 +1349,20 @@ document.addEventListener('visibilitychange', () => {
   if (pageHidden()) {
     if (timer) clearInterval(timer);
     timer = 0;
+    if (!selectGuardActive()) leftWhileHidden = true;
     return;
   }
+  const reopen = leftWhileHidden;
+  leftWhileHidden = false;
   armTimer();
+  if (reopen && !selectGuardActive()) resetViewSelections();
   if (prefs.autoRefresh) load();
+});
+window.addEventListener('pageshow', event => {
+  if (event.persisted) resetViewSelections();
+});
+document.addEventListener('resume', () => {
+  resetViewSelections();
 });
 window.addEventListener('offline', () => {
   banner.hidden = false;
@@ -1352,7 +1393,6 @@ if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
 }
 
 loadPrefs();
-hydratePanels();
 applyTheme();
 syncSettingsForm();
 updateLiveState();
