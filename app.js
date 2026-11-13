@@ -1013,6 +1013,40 @@ function playerRow(player) {
   const draft = `<span class="draft" data-draft-id="${safe(player.id)}">${safe(draftText(player.id))}</span>`;
   return `<div class="player">${headshotHtml(player)}<div><div class="player-name"><span>${safe(player.name)}</span>${chips.join('')}${badges.join('')}</div><div class="player-meta">${meta.join(' · ')}${meta.length ? ' · ' : ''}${draft}</div></div></div>`;
 }
+/* Depth-chart slots stay labeled as ESPN sent them (WR1, LDE, NB). Only the
+   display order changes, so the Roster tab starts at quarterback. */
+const ROSTER_POSITION_RANK = new Map([
+  ['QB', 10],
+  ['RB', 20], ['HB', 20], ['TB', 20],
+  ['FB', 30],
+  ['WR', 40], ['FL', 40], ['SE', 40],
+  ['TE', 50],
+  ['LT', 60], ['OT', 61], ['T', 62], ['RT', 63],
+  ['LG', 64], ['OG', 65], ['G', 66], ['RG', 67],
+  ['C', 68], ['OC', 68], ['IOL', 69], ['OL', 69],
+  ['LDE', 70], ['LE', 70], ['DE', 71], ['RDE', 72], ['RE', 72], ['EDGE', 73],
+  ['LDT', 74], ['DT', 75], ['NT', 76], ['NG', 76], ['RDT', 77], ['DL', 78],
+  ['WLB', 80], ['LOLB', 80], ['WILL', 80],
+  ['OLB', 81], ['ROLB', 81], ['SLB', 81], ['SAM', 81],
+  ['MLB', 82], ['ILB', 82], ['LILB', 82], ['RILB', 82], ['MIKE', 82],
+  ['LB', 83],
+  ['LCB', 90], ['CB', 91], ['RCB', 92], ['NB', 93], ['NCB', 93], ['NIC', 93],
+  ['SS', 100], ['FS', 101], ['S', 102], ['SAF', 102], ['DB', 103],
+  ['PK', 110], ['K', 110], ['P', 111], ['LS', 112],
+  ['H', 113], ['HOLDER', 113], ['PR', 114], ['KR', 115], ['KO', 116]
+]);
+function rosterPositionKey(pos) {
+  const letter = String(pos || '').toUpperCase().replace(/[^A-Z]/g, '');
+  if (!letter) return 90000;
+  if (ROSTER_POSITION_RANK.has(letter)) return ROSTER_POSITION_RANK.get(letter);
+  return 90000;
+}
+function sortRosterPositions(positions) {
+  return [...(positions || [])].sort((a, b) => rosterPositionKey(a.pos) - rosterPositionKey(b.pos));
+}
+function sortRosterPlayers(players) {
+  return [...(players || [])].sort((a, b) => rosterPositionKey(a.position) - rosterPositionKey(b.position));
+}
 function rosterHtml(team) {
   const record = rosters.get(team.id);
   const retry = `<div class="roster-actions"><button type="button" class="retry" data-roster-retry="${safe(team.id)}">Retry</button></div>`;
@@ -1024,11 +1058,11 @@ function rosterHtml(team) {
   if (!data.sections.length) html += '<div class="empty">No depth chart published.</div>';
   for (const section of data.sections) {
     html += `<div class="section-title">${safe(section.name)}</div>`;
-    for (const position of section.positions || []) {
+    for (const position of sortRosterPositions(section.positions)) {
       html += `<div class="pos-block"><div class="pos-label">${safe(position.pos)}</div>${(position.players || []).map(playerRow).join('')}</div>`;
     }
   }
-  const other = data.other || [];
+  const other = sortRosterPlayers(data.other || []);
   if (other.length) {
     const open = panelFor(team.id).otherOpen;
     html += `<details class="other-roster" data-team="${safe(team.id)}"${open ? ' open' : ''}><summary>Other roster (${other.length})</summary>${other.map(playerRow).join('')}</details>`;
